@@ -1,0 +1,12 @@
+body { font-weight: bold; font-family: "Courier New", Courier, monospace; } 
+
+#clock { width: 400px; height: 400px; position: absolute; border-radius: 200px; border: solid 5px; left: 50%; margin-top: 30px; margin-left: -200px; bottom: 50%; margin-bottom: -200px; display: block; background: #EED5B7; }
+#clock:after { content: '.'; background: black; left: 190px; right: 190px; top: 190px; bottom: 190px; position:absolute; border-radius: 10px; }
+#clock:before { content: "Tick Tock"; position: absolute; top: 0; left: 120px; right: 120px; bottom: 0; text-align: center; font-weight: bold; opacity: 0.2; font-size: 40px; line-height: 200px; font-family: serif; }
+#hourHand, #minHand, #secHand { position: absolute; bottom: 200px; left: 195px; -webkit-transform-origin: 50% 100%;}
+#hourHand { width: 10px; margin: 0; height: 100px; background: black; border-radius: 5px; }
+#minHand { width: 5px; margin: 0 2.5px; height: 200px; background: black; border-radius: 2.5px;  }
+#minHand:after { content: '.'; color: transparent; border: solid 15px transparent; border-bottom-color: black; width: 0; height: 0; left: -12.5px; top: -17px; position: absolute; }
+#secHand { width: 3px; margin: 0 3.5px; height: 220px; background: red; border-radius: 1.5px;  }
+
+#timeVid { position: absolute; bottom: 0; top: 0; left: 0; right: 0; max-height: 100%; max-width: 100%; margin: auto; zoom: 5; }
