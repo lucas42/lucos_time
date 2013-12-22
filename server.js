@@ -1,7 +1,6 @@
 var fs = require('fs')
    url = require('url'),
    querystring = require('querystring'),
-   sys = require('sys'),
    http = require('http'),
    resources = require('../core/resources.js');
 
@@ -12,8 +11,8 @@ resources.add('css', 'css', 'style.css');
 
 var port = parseInt(process.argv[2], 10);
 if (isNaN(port) || port <= 0) {
-	sys.puts("Usage: nodejs server.js port \n");
-	sys.puts("Error: Valid port not specified\n\n");
+	console.log("Usage: nodejs server.js port \n");
+	console.log("Error: Valid port not specified\n\n");
 	process.exit(1);
 }
 
@@ -21,13 +20,13 @@ try {
 	var configdata = fs.readFileSync('config');
 	var config = JSON.parse(configdata);
 } catch (e) {
-	sys.puts("Problem reading config data: "+e);
+	console.log("Problem reading config data: "+e);
 	process.exit(2);
 }
 
 // Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {mediaurl}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)
 if (!config.mediaurl) {
-	sys.puts("'mediaurl' not found in config");
+	console.log("'mediaurl' not found in config");
 	process.exit(3);
 }
 
@@ -115,4 +114,4 @@ http.createServer(function _handleRequest(req, res) {
 	}
 		
 }).listen(port);
-sys.puts('Server running at http://127.0.0.1:'+port+'/');
+console.log('Server running at http://127.0.0.1:'+port+'/');
