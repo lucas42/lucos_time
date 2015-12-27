@@ -1,0 +1,14 @@
+[Service]
+ExecStart=/usr/bin/nodejs /web/lucos/lucos_time/server.js 8008
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=lucos_time
+User=lucos
+Group=lucos
+Environment=NODE_ENV=production
+Environment=port=8008
+WorkingDirectory=/web/lucos/lucos_time/
+
+[Install]
+WantedBy=multi-user.target
