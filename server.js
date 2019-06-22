@@ -9,17 +9,12 @@ resources.add('js', 'js', 'time.js');
 resources.add('video', 'js', 'video.js');
 resources.add('css', 'css', 'style.css');
 
-var port = parseInt(process.argv[2], 10);
-if (isNaN(port) || port <= 0) {
-	console.log("Usage: nodejs server.js port \n");
-	console.log("Error: Valid port not specified\n\n");
-	process.exit(1);
-}
+const port = process.env.PORT || 8080;
 
 // Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {MEDIAURL}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)
 if (!process.env.MEDIAURL) {
 	console.log("'MEDIAURL' environment variable not set");
-	process.exit(3);
+	process.exit(1);
 }
 
 http.ServerResponse.prototype.sendError = function sendError(code, message, headers) {
