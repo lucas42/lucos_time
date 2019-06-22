@@ -1,0 +1,10 @@
+version: '3'
+services:
+    authentication:
+      build: .
+      container_name: time
+      ports: 
+        - "8008:8080"
+      environment:
+        - MEDIAURL
+      image: lucas42/lucos_time
