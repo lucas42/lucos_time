@@ -1,8 +1,0 @@
-{
-	"port": 8008,
-	"name": "Time",
-	"commands": {
-		"main": 'nodejs server.js %p'
-	},
-	"subdomain": "am"
-}
