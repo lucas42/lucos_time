@@ -16,17 +16,9 @@ if (isNaN(port) || port <= 0) {
 	process.exit(1);
 }
 
-try {
-	var configdata = fs.readFileSync('config');
-	var config = JSON.parse(configdata);
-} catch (e) {
-	console.log("Problem reading config data: "+e);
-	process.exit(2);
-}
-
-// Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {mediaurl}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)
-if (!config.mediaurl) {
-	console.log("'mediaurl' not found in config");
+// Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {MEDIAURL}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)
+if (!process.env.MEDIAURL) {
+	console.log("'MEDIAURL' environment variable not set");
 	process.exit(3);
 }
 
@@ -64,7 +56,7 @@ http.createServer(function _handleRequest(req, res) {
 		case "/time.manifest":
 			res.sendFile("manifest", "text/cache-manifest", function () {
 					return this.toString()
-						.replace("$mediaurl$", config.mediaurl);
+						.replace("$mediaurl$", process.env.MEDIAURL);
 				});
 			break;
 		case "/favicon.ico":
@@ -104,7 +96,7 @@ http.createServer(function _handleRequest(req, res) {
 			} else {
 				if (hour < 10) hour = '0' + hour;
 				if (min < 10) min = '0' + min;
-                                res.writeHead(302, {'Location': config.mediaurl+"/big_"+hour+"-"+min+".mp4"});
+                                res.writeHead(302, {'Location': process.env.MEDIAURL+"/big_"+hour+"-"+min+".mp4"});
                                 res.end();
 
 			}
