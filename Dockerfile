@@ -6,6 +6,7 @@ WORKDIR /web/lucos/time
 RUN apk add git
 RUN git clone https://github.com/lucas42/lucos_core.git /web/lucos/core
 
+RUN npm install node-fetch
 COPY . .
 
 ENV NODE_ENV production

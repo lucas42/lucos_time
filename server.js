@@ -1,8 +1,9 @@
-var fs = require('fs')
+const fs = require('fs')
    url = require('url'),
    querystring = require('querystring'),
    http = require('http'),
-   resources = require('../core/resources.js');
+   resources = require('../core/resources.js'),
+   fetch = require('node-fetch');
 
 /* Add the resource files used on the client */
 resources.add('js', 'js', 'time.js');
@@ -95,6 +96,28 @@ http.createServer(function _handleRequest(req, res) {
                                 res.end();
 
 			}
+			break;
+		case "/_info":
+			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
+			const output = {
+				system: 'lucos_time',
+				checks: {
+					media: {
+						techDetails: `Makes HEAD request for media file from url ${testurl}`
+					}
+				},
+				metrics: {},
+			};
+			fetch(testurl, {method: 'HEAD', timeout: 1000}).then(() => {
+				output.checks.media.ok = true;
+			}).catch(error => {
+				output.checks.media.ok = false;
+				output.checks.media.debug = error.message;
+			}).then(() => {
+				res.writeHead(200, {'Content-Type': 'application/json' });
+				res.write(JSON.stringify(output));
+				res.end();
+			});
 			break;
 		default:
 			res.sendError(404, 'File Not Found');
