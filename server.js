@@ -103,7 +103,7 @@ http.createServer(function _handleRequest(req, res) {
 				system: 'lucos_time',
 				checks: {
 					media: {
-						techDetails: `Makes HEAD request for media file from url ${testurl}`
+						techDetail: `Makes HEAD request for media file from url ${testurl}`
 					}
 				},
 				metrics: {},
