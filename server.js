@@ -107,6 +107,9 @@ http.createServer(function _handleRequest(req, res) {
 					}
 				},
 				metrics: {},
+				ci: {
+					circle: "gh/lucas42/lucos_time",
+				},
 			};
 			fetch(testurl, {method: 'HEAD', timeout: 1000}).then(() => {
 				output.checks.media.ok = true;
