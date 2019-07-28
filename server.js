@@ -111,7 +111,8 @@ http.createServer(function _handleRequest(req, res) {
 					circle: "gh/lucas42/lucos_time",
 				},
 			};
-			fetch(testurl, {method: 'HEAD', timeout: 1000}).then(() => {
+			fetch(testurl, {method: 'HEAD', timeout: 1000}).then(response => {
+				if (response.status !== 200) throw new Error(`Server returned HTTP Status Code ${response.status}`);
 				output.checks.media.ok = true;
 			}).catch(error => {
 				output.checks.media.ok = false;
