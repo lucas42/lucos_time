@@ -10,7 +10,7 @@ RUN npm install node-fetch
 COPY . .
 
 ENV NODE_ENV production
-ENV PORT 8080
+ENV PORT 8008
 EXPOSE $PORT
 
-CMD [ "node", "server.js", "8080" ]
+CMD [ "node", "server.js" ]
