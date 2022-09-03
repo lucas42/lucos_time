@@ -62,7 +62,7 @@ http.createServer(function _handleRequest(req, res) {
 			res.sendFile("icon.png", "image/png");
 			break;
 		case "/now":
-			res.writeHead(200, {'Content-Type': "application/json"});
+			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 			res.write(JSON.stringify(new Date().getTime()));
 			res.end();
 			break;
