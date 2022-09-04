@@ -1,8 +1,7 @@
 const fs = require('fs')
    url = require('url'),
    querystring = require('querystring'),
-   http = require('http'),
-   resources = require('../core/resources.js');
+   http = require('http');
 
 const port = process.env.PORT || 8080;
 
@@ -67,22 +66,13 @@ http.createServer(function _handleRequest(req, res) {
 			res.end();
 			break;
 		case "/":
-			fs.readFile('../core/bootloader.js', function _gotbootloader(err, bootloader) {
-				res.sendFile("index.xhtml", "application/xhtml+xml", function () {
-					return this.toString()
-						.replace("$now$", new Date().toTimeString())
-						.replace("$bootloader$", bootloader.toString());
-				});
+			res.sendFile("index.xhtml", "application/xhtml+xml", function () {
+				return this.toString()
+					.replace("$now$", new Date().toTimeString());
 			});
 			break;
 		case "/resources":
 			resources.load(res, params.v);
-			break;
-		case "/preload":
-			res.sendFile("../core/preload.xhtml", "application/xhtml+xml", function () {
-					return this.toString()
-						.replace("$manifest$", "/time.manifest");
-				});
 			break;
 		case "/standardtime":
 			var hour = parseInt(params.hour);
