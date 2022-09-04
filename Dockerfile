@@ -8,7 +8,7 @@ RUN git clone https://github.com/lucas42/lucos_core.git /web/lucos/core
 
 COPY package* ./
 RUN npm install
-COPY . .
+COPY src .
 
 ENV NODE_ENV production
 ENV PORT 8008
