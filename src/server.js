@@ -4,10 +4,6 @@ const fs = require('fs')
    http = require('http'),
    resources = require('../core/resources.js');
 
-/* Add the resource files used on the client */
-resources.add('js', 'js', 'time.js');
-resources.add('video', 'js', 'video.js');
-
 const port = process.env.PORT || 8080;
 
 // Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {MEDIAURL}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)

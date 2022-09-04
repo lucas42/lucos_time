@@ -24,8 +24,9 @@
   "homepage": "https://github.com/lucas42/lucos_time#readme",
   "devDependencies": {
     "folder-hash": "^4.0.2",
+    "lucos_navbar": "^1.0.0",
+    "lucos_time_component": "^1.1.1",
     "terser-webpack-plugin": "^5.3.1",
-    "webpack-cli": "^4.9.2",
-    "lucos_navbar": "^1.0.0"
+    "webpack-cli": "^4.9.2"
   }
 }
