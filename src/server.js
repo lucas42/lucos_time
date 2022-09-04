@@ -49,16 +49,16 @@ http.createServer(function _handleRequest(req, res) {
 	var params = url_parts.query;
 	switch (path) {
 		case "/time.manifest":
-			res.sendFile("manifest", "text/cache-manifest", function () {
+			res.sendFile("resources/manifest", "text/cache-manifest", function () {
 					return this.toString()
 						.replace("$mediaurl$", process.env.MEDIAURL);
 				});
 			break;
 		case "/favicon.ico":
-			res.sendFile("favicon.ico", "image/png");
+			res.sendFile("resources/favicon.ico", "image/png");
 			break;
 		case "/icon":
-			res.sendFile("icon.png", "image/png");
+			res.sendFile("resources/icon.png", "image/png");
 			break;
 		case "/now":
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
