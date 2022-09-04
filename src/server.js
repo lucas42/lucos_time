@@ -32,7 +32,7 @@ http.ServerResponse.prototype.sendFile = function sendFile(filename, mimetype, m
 		}
 	});
 };
-http.createServer(function _handleRequest(req, res) {
+http.createServer(async (req, res) => {
 	var cookies = {};
 	var agentid = null;
 	if (req.headers.cookie) {
@@ -78,17 +78,17 @@ http.createServer(function _handleRequest(req, res) {
 					circle: "gh/lucas42/lucos_time",
 				},
 			};
-			fetch(testurl, {method: 'HEAD', timeout: 1000}).then(response => {
+			try {
+				const response = await fetch(testurl, {method: 'HEAD', timeout: 1000});
 				if (response.status !== 200) throw new Error(`Server returned HTTP Status Code ${response.status}`);
 				output.checks.media.ok = true;
-			}).catch(error => {
+			} catch (error) {
 				output.checks.media.ok = false;
 				output.checks.media.debug = error.message;
-			}).then(() => {
-				res.writeHead(200, {'Content-Type': 'application/json' });
-				res.write(JSON.stringify(output));
-				res.end();
-			});
+			}
+			res.writeHead(200, {'Content-Type': 'application/json' });
+			res.write(JSON.stringify(output));
+			res.end();
 			break;
 		default:
 			res.sendError(404, 'File Not Found');
