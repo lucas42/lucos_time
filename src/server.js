@@ -42,10 +42,8 @@ http.createServer(function _handleRequest(req, res) {
 	var path = url_parts.pathname;
 	var params = url_parts.query;
 	switch (path) {
-		case "/favicon.ico":
-			res.sendFile("resources/favicon.ico", "image/png");
-			break;
 		case "/icon":
+		case "/icon.png":
 			res.sendFile("resources/icon.png", "image/png");
 			break;
 		case "/client.js":
