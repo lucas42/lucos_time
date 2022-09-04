@@ -2,7 +2,7 @@ FROM node:18-alpine
 
 WORKDIR /web/lucos/time
 
-COPY package* ./
+COPY src/package* ./
 RUN npm install
 COPY src .
 
@@ -15,4 +15,4 @@ ENV NODE_ENV production
 ENV PORT 8008
 EXPOSE $PORT
 
-CMD [ "node", "server.js" ]
+CMD [ "npm", "start" ]
