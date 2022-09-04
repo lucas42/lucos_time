@@ -1,4 +1,4 @@
- import { readFile } from 'fs';
+ import { promises as fs } from 'fs';
  import url from 'url';
  import querystring from 'querystring';
  import http from 'http';
@@ -20,17 +20,17 @@ http.ServerResponse.prototype.sendError = function sendError(code, message, head
 };
 
 
-http.ServerResponse.prototype.sendFile = function sendFile(filename, mimetype, modifications) {
-	var res = this;
-	readFile(filename, function(err, data) {
-		if (err) res.sendError(500, 'File "'+filename+'" can\'t be read from disk');
-		else {
-			if (typeof modifications == 'function') data = modifications.call(data);
-			res.writeHead(200, {'Content-Type': mimetype || 'text/html' });
-			res.write(data);
-			res.end();
-		}
-	});
+http.ServerResponse.prototype.sendFile = async function sendFile(filename, mimetype, modifications) {
+	const res = this;
+	try {
+		let data = await fs.readFile(filename);
+		if (typeof modifications == 'function') data = modifications.call(data);
+		res.writeHead(200, {'Content-Type': mimetype || 'text/html' });
+		res.write(data);
+		res.end();
+	} catch {
+		res.sendError(500, 'File "'+filename+'" can\'t be read from disk');
+	}
 };
 http.createServer(async (req, res) => {
 	var cookies = {};
