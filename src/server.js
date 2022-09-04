@@ -76,6 +76,8 @@ http.createServer(async (req, res) => {
 				ci: {
 					circle: "gh/lucas42/lucos_time",
 				},
+				icon: "/icon.png",
+				network_only: true,
 			};
 			try {
 				const response = await fetch(testurl, {method: 'HEAD', timeout: 1000});
