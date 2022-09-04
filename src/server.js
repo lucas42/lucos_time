@@ -42,7 +42,6 @@ http.createServer(async (req, res) => {
 	var path = url_parts.pathname;
 	var params = url_parts.query;
 	switch (path) {
-		case "/icon":
 		case "/icon.png":
 			res.sendFile("resources/icon.png", "image/png");
 			break;
