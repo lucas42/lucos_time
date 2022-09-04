@@ -78,6 +78,8 @@ http.createServer(async (req, res) => {
 				},
 				icon: "/icon.png",
 				network_only: true,
+				title: "Time",
+				show_on_homepage: true,
 			};
 			try {
 				const response = await fetch(testurl, {method: 'HEAD', timeout: 1000});
