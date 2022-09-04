@@ -1,7 +1,7 @@
-const fs = require('fs')
-   url = require('url'),
-   querystring = require('querystring'),
-   http = require('http');
+ import { readFile } from 'fs';
+ import url from 'url';
+ import querystring from 'querystring';
+ import http from 'http';
 
 const port = process.env.PORT || 8080;
 
@@ -22,7 +22,7 @@ http.ServerResponse.prototype.sendError = function sendError(code, message, head
 
 http.ServerResponse.prototype.sendFile = function sendFile(filename, mimetype, modifications) {
 	var res = this;
-	fs.readFile(filename, function(err, data) {
+	readFile(filename, function(err, data) {
 		if (err) res.sendError(500, 'File "'+filename+'" can\'t be read from disk');
 		else {
 			if (typeof modifications == 'function') data = modifications.call(data);
