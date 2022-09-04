@@ -42,12 +42,6 @@ http.createServer(function _handleRequest(req, res) {
 	var path = url_parts.pathname;
 	var params = url_parts.query;
 	switch (path) {
-		case "/time.manifest":
-			res.sendFile("resources/manifest", "text/cache-manifest", function () {
-					return this.toString()
-						.replace("$mediaurl$", process.env.MEDIAURL);
-				});
-			break;
 		case "/favicon.ico":
 			res.sendFile("resources/favicon.ico", "image/png");
 			break;
