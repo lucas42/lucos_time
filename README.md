@@ -1,14 +1,6 @@
 # lucos time
 A clock module for lucos
 
-## Features
-* Works offline.
-* Displays a CSS-powered analogue clock.
-* Newer browsers show videos instead of the clock whilst online (note: videos not included).
-* Text based browsers show the time written.
-* Other javascript modules can request the time by opening this module in an iframe and communicating using post messages.
-* Time is computed using a crude version of NTP over AJAX and stored as an offset against the client's time.
-
 ## Dependencies
 * docker
 * docker-compose
