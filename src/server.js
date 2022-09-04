@@ -2,8 +2,7 @@ const fs = require('fs')
    url = require('url'),
    querystring = require('querystring'),
    http = require('http'),
-   resources = require('../core/resources.js'),
-   fetch = require('node-fetch');
+   resources = require('../core/resources.js');
 
 /* Add the resource files used on the client */
 resources.add('js', 'js', 'time.js');
