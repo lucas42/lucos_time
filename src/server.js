@@ -7,7 +7,6 @@ const fs = require('fs')
 /* Add the resource files used on the client */
 resources.add('js', 'js', 'time.js');
 resources.add('video', 'js', 'video.js');
-resources.add('css', 'css', 'style.css');
 
 const port = process.env.PORT || 8080;
 
@@ -62,6 +61,9 @@ http.createServer(function _handleRequest(req, res) {
 			break;
 		case "/client.js":
 			res.sendFile("resources/client.js", "text/javascript");
+			break;
+		case "/style.css":
+			res.sendFile("resources/style.css", "text/css");
 			break;
 		case "/now":
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
