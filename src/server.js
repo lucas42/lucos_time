@@ -68,24 +68,12 @@ http.createServer(function _handleRequest(req, res) {
 		case "/":
 			res.sendFile("index.xhtml", "application/xhtml+xml", function () {
 				return this.toString()
-					.replace("$now$", new Date().toTimeString());
+					.replace("$now$", new Date().toTimeString())
+					.replace("$mediaurl$", process.env.MEDIAURL);
 			});
 			break;
 		case "/resources":
 			resources.load(res, params.v);
-			break;
-		case "/standardtime":
-			var hour = parseInt(params.hour);
-			var min = parseInt(params.min);
-			if (isNaN(hour) || hour < 0 || hour >= 24 || isNaN(min) || min < 0 || min >= 60 || min % 10) {
-				res.sendError(404, 'File Not Found');
-			} else {
-				if (hour < 10) hour = '0' + hour;
-				if (min < 10) min = '0' + min;
-                                res.writeHead(302, {'Location': process.env.MEDIAURL+"/big_"+hour+"-"+min+".mp4"});
-                                res.end();
-
-			}
 			break;
 		case "/_info":
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;

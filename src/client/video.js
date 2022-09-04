@@ -4,18 +4,17 @@ import { getTime } from 'lucos_time_component';
 showClock();
 document.addEventListener('click', showPlayer);
 
+const leadingZero = (num) => num.toString().padStart(2, '0');
+
 function showPlayer() {
 	const player = document.createElement("video");
 	player.id = 'timeVid';
 	function _updateVid() {
-		var date = new Date(getTime());
-		var hour = date.getHours();
-		var min = Math.floor(date.getMinutes() / 10) * 10;
-		var offset = (date.getMinutes() - min) * 60 + date.getSeconds();
-		if (hour < 10) hour = '0' + hour;
-		if (min < 10) min = '0' + min;
-
-		var src = "/standardtime?hour="+hour+'&min='+min;
+		const date = new Date(getTime());
+		const hour = date.getHours();
+		const min = Math.floor(date.getMinutes() / 10) * 10;
+		const offset = (date.getMinutes() - min) * 60 + date.getSeconds();
+		const src = window.MEDIAURL+`/big_${leadingZero(hour)}-${leadingZero(min)}.mp4`;
 		if (player.getAttribute("src") == src) {
 			if (player.paused) player.play();
 			if (Math.abs(player.currentTime - offset) < 2) return;
@@ -48,7 +47,7 @@ function showPlayer() {
 	document.removeEventListener('click', showPlayer);
 }
 
-let timeNode_timeout;
+var timeNode_timeout;
 function showClock() {
 	var clock;
 	if (!document.querySelector(".now")) return;
