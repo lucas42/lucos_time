@@ -60,6 +60,9 @@ http.createServer(function _handleRequest(req, res) {
 		case "/icon":
 			res.sendFile("resources/icon.png", "image/png");
 			break;
+		case "/client.js":
+			res.sendFile("resources/client.js", "text/javascript");
+			break;
 		case "/now":
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 			res.write(JSON.stringify(new Date().getTime()));

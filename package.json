@@ -1,1 +1,31 @@
-{}
+{
+  "name": "lucos_time",
+  "version": "2.0.0",
+  "description": "A clock module for lucos",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server/index.js",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucas42/lucos_time.git"
+  },
+  "keywords": [
+    "lucos",
+    "time",
+    "clock"
+  ],
+  "author": "lucas42",
+  "bugs": {
+    "url": "https://github.com/lucas42/lucos_time/issues"
+  },
+  "homepage": "https://github.com/lucas42/lucos_time#readme",
+  "devDependencies": {
+    "folder-hash": "^4.0.2",
+    "terser-webpack-plugin": "^5.3.1",
+    "webpack-cli": "^4.9.2",
+    "lucos_navbar": "^1.0.0"
+  }
+}
