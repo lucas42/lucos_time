@@ -72,9 +72,6 @@ http.createServer(function _handleRequest(req, res) {
 					.replace("$mediaurl$", process.env.MEDIAURL);
 			});
 			break;
-		case "/resources":
-			resources.load(res, params.v);
-			break;
 		case "/_info":
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
 			const output = {
