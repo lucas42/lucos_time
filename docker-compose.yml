@@ -1,10 +1,11 @@
 version: '3'
 services:
-    time:
-      build: .
-      container_name: time
-      ports: 
-        - "8008:8008"
-      environment:
-        - MEDIAURL
-      image: lucas42/lucos_time
+  time:
+    build: .
+    container_name: time
+    ports: 
+      - "8008:8008"
+    environment:
+      - MEDIAURL
+    image: lucas42/lucos_time
+    restart: always
