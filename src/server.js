@@ -82,7 +82,7 @@ http.createServer(async (req, res) => {
 				show_on_homepage: true,
 			};
 			try {
-				const response = await fetch(testurl, {method: 'HEAD', timeout: 1000});
+				const response = await fetch(testurl, { method: 'HEAD', signal: AbortSignal.timeout(900) });
 				if (response.status !== 200) throw new Error(`Server returned HTTP Status Code ${response.status}`);
 				output.checks.media.ok = true;
 			} catch (error) {
