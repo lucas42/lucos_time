@@ -9,3 +9,4 @@ services:
       - MEDIAURL
     image: lucas42/lucos_time
     restart: always
+    network_mode: host
