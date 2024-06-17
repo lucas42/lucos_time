@@ -27,6 +27,6 @@
     "lucos_navbar": "^2.0.0",
     "lucos_time_component": "^1.1.1",
     "terser-webpack-plugin": "^5.3.1",
-    "webpack-cli": "^4.9.2"
+    "webpack-cli": "^5.1.4"
   }
 }
