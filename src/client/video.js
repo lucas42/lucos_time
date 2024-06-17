@@ -1,4 +1,4 @@
-import { getTime } from 'lucos_time_component';
+import { getDatetime } from 'lucos_time_component';
 
 // Add the clock whilst working out if there's vids etc available (sometimes takes a while)
 showClock();
@@ -10,7 +10,7 @@ function showPlayer() {
 	const player = document.createElement("video");
 	player.id = 'timeVid';
 	function _updateVid() {
-		const date = new Date(getTime());
+		const date = getDatetime();
 		const hour = date.getHours();
 		const min = Math.floor(date.getMinutes() / 10) * 10;
 		const offset = (date.getMinutes() - min) * 60 + date.getSeconds();
@@ -66,7 +66,7 @@ function showClock() {
 	document.body.appendChild(clock);
 	function updateInlineTime() {
 		if (timeNode_timeout) clearTimeout(timeNode_timeout);
-		var date = new Date(getTime());
+		var date = getDatetime();
 		document.querySelector(".now").firstChild.nodeValue = date.toTimeString();
 		var hourDeg = date.getHours() * 30;
 		var minDeg = date.getMinutes() * 6;
