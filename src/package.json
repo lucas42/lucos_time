@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/lucas42/lucos_time#readme",
   "devDependencies": {
-    "folder-hash": "^4.0.4",
+    "folder-hash": "^4.1.0",
     "lucos_navbar": "^2.0.4",
     "lucos_time_component": "^2.1.5",
     "terser-webpack-plugin": "^5.3.11",
