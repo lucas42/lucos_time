@@ -26,7 +26,7 @@
     "folder-hash": "^4.1.1",
     "lucos_navbar": "^2.0.10",
     "lucos_time_component": "^2.1.6",
-    "terser-webpack-plugin": "^5.3.11",
+    "terser-webpack-plugin": "^5.3.12",
     "webpack-cli": "^6.0.1"
   }
 }
