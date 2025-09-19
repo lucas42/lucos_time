@@ -1,0 +1,22 @@
+{
+	"name": "lucOS Time",
+	"short_name": "Time",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"theme_color": "#000",
+	"icons":[
+		{
+			"src": "/icon.png",
+			"sizes": "100x100",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/maskable_icon.png",
+			"sizes": "111x111",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

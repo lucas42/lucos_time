@@ -45,11 +45,17 @@ http.createServer(async (req, res) => {
 		case "/icon.png":
 			res.sendFile("resources/icon.png", "image/png");
 			break;
+		case "/maskable_icon.png":
+			res.sendFile("resources/maskable_icon.png", "image/png");
+			break;
 		case "/client.js":
 			res.sendFile("resources/client.js", "text/javascript");
 			break;
 		case "/style.css":
 			res.sendFile("resources/style.css", "text/css");
+			break;
+		case "/manifest.json":
+			res.sendFile("resources/manifest.json", "application/manifest+json");
 			break;
 		case "/now":
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
