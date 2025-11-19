@@ -25,7 +25,7 @@
   "devDependencies": {
     "folder-hash": "^4.1.1",
     "lucos_navbar": "^2.0.15",
-    "lucos_time_component": "^2.1.16",
+    "lucos_time_component": "^2.1.17",
     "terser-webpack-plugin": "^5.3.14",
     "webpack-cli": "^6.0.1"
   }
