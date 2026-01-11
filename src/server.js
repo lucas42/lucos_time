@@ -3,13 +3,11 @@
  import querystring from 'querystring';
  import http from 'http';
 
-const port = process.env.PORT || 8080;
+const port = process.env.PORT;
+if (!port) throw "'PORT' environment variable not set";
 
 // Media url is the url of a directory where the time videos are kept.  Each video is 10 minutes long and its file name is {MEDIAURL}/big_{hour}-{min}.mp4 (hour and min are two digit numbers and rounded to 10 minute intervals)
-if (!process.env.MEDIAURL) {
-	console.log("'MEDIAURL' environment variable not set");
-	process.exit(1);
-}
+if (!process.env.MEDIAURL) throw "'MEDIAURL' environment variable not set";
 
 http.ServerResponse.prototype.sendError = function sendError(code, message, headers) {
 	if (!headers) headers = {};

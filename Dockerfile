@@ -12,7 +12,5 @@ RUN npm prune --omit=dev
 RUN rm -rf client service-worker webpack*
 
 ENV NODE_ENV production
-ENV PORT 8008
-EXPOSE $PORT
 
 CMD [ "npm", "start" ]

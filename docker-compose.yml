@@ -3,9 +3,10 @@ services:
     build: .
     container_name: time
     ports: 
-      - "8008:8008"
+      - $PORT:$PORT
     environment:
       - MEDIAURL
+      - PORT
     image: lucas42/lucos_time
     restart: always
     network_mode: host
