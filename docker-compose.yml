@@ -9,4 +9,10 @@ services:
       - PORT
     image: lucas42/lucos_time
     restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT}/_info"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     network_mode: host
