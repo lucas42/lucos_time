@@ -121,4 +121,4 @@ http.createServer(async (req, res) => {
 console.log('Server running at http://127.0.0.1:'+port+'/');
 
 // Start eolas cache in the background (non-blocking)
-startCache();
+startCache().catch(err => { console.error(err.message); process.exit(1); });
