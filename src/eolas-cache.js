@@ -2,6 +2,7 @@ import { Parser } from 'n3';
 
 const EOLAS_URL = process.env.EOLAS_URL || 'https://eolas.l42.eu';
 const KEY_LUCOS_TIME = process.env.KEY_LUCOS_TIME;
+if (!KEY_LUCOS_TIME) console.warn('KEY_LUCOS_TIME not set — eolas requests will be unauthenticated');
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 const EOLAS_NS = 'https://eolas.l42.eu/ontology/';
@@ -81,7 +82,6 @@ function buildCache(entities) {
 		calendars: new Map(),
 		festivals: [],
 		historicalEvents: new Map(),
-		commemoratesMap: new Map(),
 	};
 
 	// First pass: identify calendars
@@ -119,7 +119,6 @@ function buildCache(entities) {
 			const dayOfMonth = entity.properties[PREDICATES.dayOfMonth]
 				? parseInt(entity.properties[PREDICATES.dayOfMonth], 10)
 				: null;
-			const commemoratesUri = entity.properties[PREDICATES.commemorates] || null;
 
 			items.festivals.push({
 				uri,
@@ -127,15 +126,7 @@ function buildCache(entities) {
 				type: 'Festival',
 				monthUri,
 				dayOfMonth,
-				commemoratesUri,
 			});
-
-			if (commemoratesUri) {
-				if (!items.commemoratesMap.has(uri)) {
-					items.commemoratesMap.set(uri, []);
-				}
-				items.commemoratesMap.get(uri).push(commemoratesUri);
-			}
 		} else if (entity.types.includes(TYPE_URIS.HistoricalEvent)) {
 			items.historicalEvents.set(uri, {
 				uri,
@@ -145,8 +136,6 @@ function buildCache(entities) {
 		}
 	}
 
-	// Also collect commemorates from quads where a festival has multiple commemorates relationships
-	// (the properties map only stores the last one)
 	return items;
 }
 
