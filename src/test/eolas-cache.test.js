@@ -8,45 +8,45 @@ const SAMPLE_TURTLE = `
 @prefix eolas: <https://eolas.l42.eu/ontology/> .
 @prefix wdt: <http://www.wikidata.org/prop/direct/> .
 
-<https://eolas.l42.eu/metadata/calendar/1/>
+<https://example.com/calendar/1/>
     rdf:type eolas:Calendar ;
     rdfs:label "Gregorian" .
 
-<https://eolas.l42.eu/metadata/dayofweek/1/>
+<https://example.com/dayofweek/1/>
     rdf:type eolas:DayOfWeek ;
     rdfs:label "Monday" ;
     eolas:order 1 .
 
-<https://eolas.l42.eu/metadata/dayofweek/7/>
+<https://example.com/dayofweek/7/>
     rdf:type eolas:DayOfWeek ;
     rdfs:label "Sunday" ;
     eolas:order 7 .
 
-<https://eolas.l42.eu/metadata/month/3/>
+<https://example.com/month/3/>
     rdf:type eolas:Month ;
     rdfs:label "March" ;
     eolas:order_in_calendar 3 ;
-    eolas:calendar <https://eolas.l42.eu/metadata/calendar/1/> .
+    eolas:calendar <https://example.com/calendar/1/> .
 
-<https://eolas.l42.eu/metadata/month/12/>
+<https://example.com/month/12/>
     rdf:type eolas:Month ;
     rdfs:label "December" ;
     eolas:order_in_calendar 12 ;
-    eolas:calendar <https://eolas.l42.eu/metadata/calendar/1/> .
+    eolas:calendar <https://example.com/calendar/1/> .
 
-<https://eolas.l42.eu/metadata/festival/1/>
+<https://example.com/festival/1/>
     rdf:type eolas:Festival ;
     rdfs:label "Christmas Day" ;
-    eolas:month <https://eolas.l42.eu/metadata/month/12/> ;
+    eolas:month <https://example.com/month/12/> ;
     eolas:day_of_month 25 ;
-    wdt:P547 <https://eolas.l42.eu/metadata/historicalevent/1/> .
+    wdt:P547 <https://example.com/historicalevent/1/> .
 
-<https://eolas.l42.eu/metadata/festival/2/>
+<https://example.com/festival/2/>
     rdf:type eolas:Festival ;
     rdfs:label "March Month Festival" ;
-    eolas:month <https://eolas.l42.eu/metadata/month/3/> .
+    eolas:month <https://example.com/month/3/> .
 
-<https://eolas.l42.eu/metadata/historicalevent/1/>
+<https://example.com/historicalevent/1/>
     rdf:type eolas:HistoricalEvent ;
     rdfs:label "The Nativity of Jesus Christ" .
 `;
@@ -77,7 +77,7 @@ describe('buildCacheFromQuads', () => {
 		const quads = await parseRdf(SAMPLE_TURTLE);
 		const cache = buildCacheFromQuads(quads);
 		assert.equal(cache.calendars.size, 1);
-		const cal = cache.calendars.get('https://eolas.l42.eu/metadata/calendar/1/');
+		const cal = cache.calendars.get('https://example.com/calendar/1/');
 		assert.ok(cal);
 		assert.equal(cal.name, 'Gregorian');
 	});
@@ -89,7 +89,7 @@ describe('buildCacheFromQuads', () => {
 		const march = cache.months.find(m => m.name === 'March');
 		assert.ok(march);
 		assert.equal(march.orderInCalendar, 3);
-		assert.equal(march.calendarUri, 'https://eolas.l42.eu/metadata/calendar/1/');
+		assert.equal(march.calendarUri, 'https://example.com/calendar/1/');
 	});
 
 	it('should extract Festivals with month and day_of_month', async () => {
@@ -99,7 +99,7 @@ describe('buildCacheFromQuads', () => {
 		const christmas = cache.festivals.find(f => f.name === 'Christmas Day');
 		assert.ok(christmas);
 		assert.equal(christmas.dayOfMonth, 25);
-		assert.equal(christmas.monthUri, 'https://eolas.l42.eu/metadata/month/12/');
+		assert.equal(christmas.monthUri, 'https://example.com/month/12/');
 	});
 
 	it('should extract Festivals without day_of_month as null', async () => {
@@ -114,7 +114,7 @@ describe('buildCacheFromQuads', () => {
 		const quads = await parseRdf(SAMPLE_TURTLE);
 		const cache = buildCacheFromQuads(quads);
 		assert.equal(cache.historicalEvents.size, 1);
-		const nativity = cache.historicalEvents.get('https://eolas.l42.eu/metadata/historicalevent/1/');
+		const nativity = cache.historicalEvents.get('https://example.com/historicalevent/1/');
 		assert.ok(nativity);
 		assert.equal(nativity.name, 'The Nativity of Jesus Christ');
 	});
@@ -122,10 +122,10 @@ describe('buildCacheFromQuads', () => {
 	it('should build commemorates map from Festival to HistoricalEvent', async () => {
 		const quads = await parseRdf(SAMPLE_TURTLE);
 		const cache = buildCacheFromQuads(quads);
-		const commemorated = cache.commemoratesMap.get('https://eolas.l42.eu/metadata/festival/1/');
+		const commemorated = cache.commemoratesMap.get('https://example.com/festival/1/');
 		assert.ok(commemorated);
 		assert.equal(commemorated.length, 1);
-		assert.equal(commemorated[0], 'https://eolas.l42.eu/metadata/historicalevent/1/');
+		assert.equal(commemorated[0], 'https://example.com/historicalevent/1/');
 	});
 
 	it('should handle empty quads', () => {

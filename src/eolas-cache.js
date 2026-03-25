@@ -1,8 +1,7 @@
 import { Parser } from 'n3';
 
-const EOLAS_URL = process.env.EOLAS_URL || 'https://eolas.l42.eu';
+const EOLAS_URL = process.env.EOLAS_URL;
 const KEY_LUCOS_TIME = process.env.KEY_LUCOS_TIME;
-if (!KEY_LUCOS_TIME) console.warn('KEY_LUCOS_TIME not set — eolas requests will be unauthenticated');
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 const EOLAS_NS = 'https://eolas.l42.eu/ontology/';
@@ -163,10 +162,9 @@ async function fetchFromEolas() {
 	const url = `${EOLAS_URL}/metadata/all/data/`;
 	const headers = {
 		'User-Agent': 'lucos_time',
+		'Authorization': `Key ${KEY_LUCOS_TIME}`,
+		'Accept': 'text/turtle',
 	};
-	if (KEY_LUCOS_TIME) {
-		headers['Authorization'] = 'Basic ' + Buffer.from(`lucos_time:${KEY_LUCOS_TIME}`).toString('base64');
-	}
 
 	const response = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
 	if (!response.ok) {
@@ -185,8 +183,10 @@ export async function refreshCache() {
 			lastRefreshed: new Date(),
 			error: null,
 		};
+		console.log('Eolas cache refreshed');
 	} catch (error) {
 		cache.error = error.message;
+		console.error('Eolas cache refresh failed:', error.message);
 		// If we've never loaded successfully, keep empty items
 		if (!cache.lastRefreshed) {
 			cache.items = buildCacheFromQuads([]);
@@ -209,6 +209,8 @@ export function getCacheStatus() {
 let refreshInterval = null;
 
 export async function startCache() {
+	if (!EOLAS_URL) throw new Error("'EOLAS_URL' environment variable not set");
+	if (!KEY_LUCOS_TIME) throw new Error("'KEY_LUCOS_TIME' environment variable not set");
 	await refreshCache();
 	refreshInterval = setInterval(refreshCache, REFRESH_INTERVAL_MS);
 }

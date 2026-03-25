@@ -121,11 +121,4 @@ http.createServer(async (req, res) => {
 console.log('Server running at http://127.0.0.1:'+port+'/');
 
 // Start eolas cache in the background (non-blocking)
-startCache().then(() => {
-	const status = getCacheStatus();
-	if (status.populated) {
-		console.log('Eolas cache loaded successfully');
-	} else {
-		console.warn('Eolas cache failed to load on startup:', status.error);
-	}
-});
+startCache();

@@ -13,7 +13,7 @@ function makeCache({
 	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap };
 }
 
-const GREGORIAN_CAL_URI = 'https://eolas.l42.eu/metadata/calendar/1/';
+const GREGORIAN_CAL_URI = 'https://example.com/calendar/1/';
 
 function gregorianCalendars() {
 	return new Map([[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }]]);
@@ -90,7 +90,7 @@ describe('getCurrentItems', () => {
 		});
 
 		it('should not match non-Gregorian months', () => {
-			const nonGregorianUri = 'https://eolas.l42.eu/metadata/calendar/2/';
+			const nonGregorianUri = 'https://example.com/calendar/2/';
 			const nonGregorianMonth = {
 				uri: 'month/chinese/1', name: 'First Month', type: 'Month',
 				orderInCalendar: 3, calendarUri: nonGregorianUri,
