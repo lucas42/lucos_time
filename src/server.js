@@ -2,6 +2,8 @@
  import url from 'url';
  import querystring from 'querystring';
  import http from 'http';
+ import { startCache, getCache, getCacheStatus } from './eolas-cache.js';
+ import { getCurrentItems } from './temporal-matcher.js';
 
 const port = process.env.PORT;
 if (!port) throw "'PORT' environment variable not set";
@@ -60,6 +62,12 @@ http.createServer(async (req, res) => {
 			res.write(JSON.stringify(new Date().getTime()));
 			res.end();
 			break;
+		case "/current-items":
+			const currentItemsResult = getCurrentItems(getCache().items);
+			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
+			res.write(JSON.stringify(currentItemsResult));
+			res.end();
+			break;
 		case "/":
 			res.sendFile("index.xhtml", "application/xhtml+xml", function () {
 				return this.toString()
@@ -69,14 +77,22 @@ http.createServer(async (req, res) => {
 			break;
 		case "/_info":
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
+			const eolasStatus = getCacheStatus();
 			const output = {
 				system: 'lucos_time',
 				checks: {
 					media: {
 						techDetail: `Makes HEAD request for media file from url ${testurl}`
+					},
+					eolas: {
+						techDetail: 'Checks whether the eolas RDF cache is populated and fresh',
+						ok: eolasStatus.populated,
+						debug: eolasStatus.error || undefined,
 					}
 				},
-				metrics: {},
+				metrics: {
+					eolasLastRefreshed: eolasStatus.lastRefreshed,
+				},
 				ci: {
 					circle: "gh/lucas42/lucos_time",
 				},
@@ -103,3 +119,13 @@ http.createServer(async (req, res) => {
 		
 }).listen(port);
 console.log('Server running at http://127.0.0.1:'+port+'/');
+
+// Start eolas cache in the background (non-blocking)
+startCache().then(() => {
+	const status = getCacheStatus();
+	if (status.populated) {
+		console.log('Eolas cache loaded successfully');
+	} else {
+		console.warn('Eolas cache failed to load on startup:', status.error);
+	}
+});

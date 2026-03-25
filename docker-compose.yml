@@ -7,6 +7,8 @@ services:
     environment:
       - MEDIAURL
       - PORT
+      - KEY_LUCOS_TIME
+      - EOLAS_URL
     image: lucas42/lucos_time
     restart: always
     healthcheck:
