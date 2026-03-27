@@ -38,14 +38,18 @@ const SAMPLE_TURTLE = `
 <https://example.com/festival/1/>
     rdf:type eolas:Festival ;
     rdfs:label "Christmas Day" ;
-    eolas:month <https://example.com/month/12/> ;
-    eolas:day_of_month 25 ;
+    eolas:festivalStartsOn [
+        time:day 25 ;
+        time:MonthOfYear <https://example.com/month/12/>
+    ] ;
     wdt:P547 <https://example.com/historicalevent/1/> .
 
 <https://example.com/festival/2/>
     rdf:type eolas:Festival ;
     rdfs:label "March Month Festival" ;
-    eolas:month <https://example.com/month/3/> .
+    eolas:festivalStartsOn [
+        time:MonthOfYear <https://example.com/month/3/>
+    ] .
 
 <https://example.com/historicalevent/1/>
     rdf:type eolas:HistoricalEvent ;

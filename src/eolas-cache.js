@@ -22,8 +22,9 @@ const PREDICATES = {
 	orderInWeek: `${EOLAS_NS}orderInWeek`,
 	orderInCalendar: `${EOLAS_NS}orderInCalendar`,
 	calendar: `${EOLAS_NS}calendar`,
-	month: `${EOLAS_NS}month`,
-	dayOfMonth: `${EOLAS_NS}day_of_month`,
+	festivalStartsOn: `${EOLAS_NS}festivalStartsOn`,
+	timeDay: `${TIME_NS}day`,
+	timeMonthOfYear: `${TIME_NS}MonthOfYear`,
 	commemorates: COMMEMORATES,
 };
 
@@ -109,17 +110,12 @@ function buildCache(entities) {
 				calendarUri,
 			});
 		} else if (entity.types.includes(TYPE_URIS.Festival)) {
-			const monthUri = entity.properties[PREDICATES.month];
-			const dayOfMonth = entity.properties[PREDICATES.dayOfMonth]
-				? parseInt(entity.properties[PREDICATES.dayOfMonth], 10)
-				: null;
-
 			items.festivals.push({
 				uri,
 				name: entity.name,
 				type: 'Festival',
-				monthUri,
-				dayOfMonth,
+				monthUri: entity.festivalMonthUri || null,
+				dayOfMonth: entity.festivalDayOfMonth !== undefined ? entity.festivalDayOfMonth : null,
 			});
 		} else if (entity.types.includes(TYPE_URIS.HistoricalEvent)) {
 			items.historicalEvents.set(uri, {
@@ -135,6 +131,37 @@ function buildCache(entities) {
 
 function buildCacheFromQuads(quads) {
 	const entities = extractEntities(quads);
+
+	// Resolve festival start-date blank nodes:
+	// eolas serialises as: <festival> festivalStartsOn _:b . _:b time:day N . _:b time:MonthOfYear <month> .
+	// We need to flatten this into monthUri/dayOfMonth on the festival entity.
+	const startDayBnodes = new Map(); // bnode id → { day, monthUri }
+	const festivalToBnode = new Map(); // festival uri → bnode id
+
+	for (const quad of quads) {
+		const pred = quad.predicate.value;
+		if (pred === PREDICATES.festivalStartsOn) {
+			festivalToBnode.set(quad.subject.value, quad.object.value);
+		} else if (pred === PREDICATES.timeDay) {
+			const bnode = quad.subject.value;
+			if (!startDayBnodes.has(bnode)) startDayBnodes.set(bnode, {});
+			startDayBnodes.get(bnode).day = quad.object.value;
+		} else if (pred === PREDICATES.timeMonthOfYear) {
+			const bnode = quad.subject.value;
+			if (!startDayBnodes.has(bnode)) startDayBnodes.set(bnode, {});
+			startDayBnodes.get(bnode).monthUri = quad.object.value;
+		}
+	}
+
+	// Attach resolved start-date fields to festival entities
+	for (const [festivalUri, bnodeId] of festivalToBnode) {
+		const entity = entities.get(festivalUri);
+		const startDay = startDayBnodes.get(bnodeId);
+		if (entity && startDay) {
+			entity.festivalMonthUri = startDay.monthUri || null;
+			entity.festivalDayOfMonth = startDay.day ? parseInt(startDay.day, 10) : null;
+		}
+	}
 
 	// Handle multiple commemorates relationships per festival
 	const commemoratesMap = new Map();
