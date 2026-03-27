@@ -1,7 +1,7 @@
 services:
   time:
     build: .
-    container_name: time
+    container_name: lucos_time
     ports: 
       - $PORT:$PORT
     environment:
