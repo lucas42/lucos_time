@@ -1,35 +1,30 @@
 import { Parser } from 'n3';
 
 const EOLAS_URL = process.env.EOLAS_URL;
-const KEY_LUCOS_TIME = process.env.KEY_LUCOS_TIME;
+const KEY_LUCOS_EOLAS = process.env.KEY_LUCOS_EOLAS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 const EOLAS_NS = 'https://eolas.l42.eu/ontology/';
+const TIME_NS = 'http://www.w3.org/2006/time#';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
 const COMMEMORATES = 'http://www.wikidata.org/prop/direct/P547';
 
 const TYPE_URIS = {
-	DayOfWeek: `${EOLAS_NS}DayOfWeek`,
-	Month: `${EOLAS_NS}Month`,
+	DayOfWeek: `${TIME_NS}DayOfWeek`,
+	Month: `${TIME_NS}MonthOfYear`,
 	Festival: `${EOLAS_NS}Festival`,
 	HistoricalEvent: `${EOLAS_NS}HistoricalEvent`,
 	Calendar: `${EOLAS_NS}Calendar`,
 };
 
 const PREDICATES = {
-	order: `${EOLAS_NS}order`,
-	orderInCalendar: `${EOLAS_NS}order_in_calendar`,
+	orderInWeek: `${EOLAS_NS}orderInWeek`,
+	orderInCalendar: `${EOLAS_NS}orderInCalendar`,
 	calendar: `${EOLAS_NS}calendar`,
 	month: `${EOLAS_NS}month`,
 	dayOfMonth: `${EOLAS_NS}day_of_month`,
 	commemorates: COMMEMORATES,
-};
-
-let cache = {
-	items: new Map(),
-	lastRefreshed: null,
-	error: null,
 };
 
 function parseRdf(rdfText) {
@@ -102,7 +97,7 @@ function buildCache(entities) {
 				uri,
 				name: entity.name,
 				type: 'DayOfWeek',
-				order: parseInt(entity.properties[PREDICATES.order], 10),
+				order: parseInt(entity.properties[PREDICATES.orderInWeek], 10),
 			});
 		} else if (entity.types.includes(TYPE_URIS.Month)) {
 			const calendarUri = entity.properties[PREDICATES.calendar];
@@ -162,7 +157,7 @@ async function fetchFromEolas() {
 	const url = `${EOLAS_URL}/metadata/all/data/`;
 	const headers = {
 		'User-Agent': 'lucos_time',
-		'Authorization': `Key ${KEY_LUCOS_TIME}`,
+		'Authorization': `Key ${KEY_LUCOS_EOLAS}`,
 		'Accept': 'text/turtle',
 	};
 
@@ -174,6 +169,12 @@ async function fetchFromEolas() {
 	const quads = await parseRdf(rdfText);
 	return buildCacheFromQuads(quads);
 }
+
+let cache = {
+	items: buildCacheFromQuads([]),
+	lastRefreshed: null,
+	error: null,
+};
 
 export async function refreshCache() {
 	try {
@@ -187,10 +188,6 @@ export async function refreshCache() {
 	} catch (error) {
 		cache.error = error.message;
 		console.error('Eolas cache refresh failed:', error.message);
-		// If we've never loaded successfully, keep empty items
-		if (!cache.lastRefreshed) {
-			cache.items = buildCacheFromQuads([]);
-		}
 	}
 }
 
@@ -210,7 +207,7 @@ let refreshInterval = null;
 
 export async function startCache() {
 	if (!EOLAS_URL) throw new Error("'EOLAS_URL' environment variable not set");
-	if (!KEY_LUCOS_TIME) throw new Error("'KEY_LUCOS_TIME' environment variable not set");
+	if (!KEY_LUCOS_EOLAS) throw new Error("'KEY_LUCOS_EOLAS' environment variable not set");
 	await refreshCache();
 	refreshInterval = setInterval(refreshCache, REFRESH_INTERVAL_MS);
 }
@@ -223,4 +220,4 @@ export function stopCache() {
 }
 
 // Exported for testing
-export { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, RDF_TYPE, RDFS_LABEL };
+export { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL };

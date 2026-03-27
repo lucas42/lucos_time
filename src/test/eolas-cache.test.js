@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, RDF_TYPE, RDFS_LABEL } from '../eolas-cache.js';
+import { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL } from '../eolas-cache.js';
 
 const SAMPLE_TURTLE = `
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix eolas: <https://eolas.l42.eu/ontology/> .
+@prefix time: <http://www.w3.org/2006/time#> .
 @prefix wdt: <http://www.wikidata.org/prop/direct/> .
 
 <https://example.com/calendar/1/>
@@ -13,25 +14,25 @@ const SAMPLE_TURTLE = `
     rdfs:label "Gregorian" .
 
 <https://example.com/dayofweek/1/>
-    rdf:type eolas:DayOfWeek ;
+    rdf:type time:DayOfWeek ;
     rdfs:label "Monday" ;
-    eolas:order 1 .
+    eolas:orderInWeek 1 .
 
 <https://example.com/dayofweek/7/>
-    rdf:type eolas:DayOfWeek ;
+    rdf:type time:DayOfWeek ;
     rdfs:label "Sunday" ;
-    eolas:order 7 .
+    eolas:orderInWeek 7 .
 
 <https://example.com/month/3/>
-    rdf:type eolas:Month ;
+    rdf:type time:MonthOfYear ;
     rdfs:label "March" ;
-    eolas:order_in_calendar 3 ;
+    eolas:orderInCalendar 3 ;
     eolas:calendar <https://example.com/calendar/1/> .
 
 <https://example.com/month/12/>
-    rdf:type eolas:Month ;
+    rdf:type time:MonthOfYear ;
     rdfs:label "December" ;
-    eolas:order_in_calendar 12 ;
+    eolas:orderInCalendar 12 ;
     eolas:calendar <https://example.com/calendar/1/> .
 
 <https://example.com/festival/1/>

@@ -7,7 +7,7 @@ services:
     environment:
       - MEDIAURL
       - PORT
-      - KEY_LUCOS_TIME
+      - KEY_LUCOS_EOLAS
       - EOLAS_URL
     image: lucas42/lucos_time
     restart: always
