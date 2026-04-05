@@ -203,6 +203,35 @@ let cache = {
 	error: null,
 };
 
+async function reportToScheduleTracker(success, message) {
+	const endpoint = process.env.SCHEDULE_TRACKER_ENDPOINT;
+	if (!endpoint) return;
+	const payload = {
+		system: process.env.SYSTEM || 'lucos_time',
+		frequency: REFRESH_INTERVAL_MS / 1000,
+		status: success ? 'success' : 'error',
+		...(message && { message }),
+	};
+	try {
+		const response = await fetch(`${endpoint}/report-status`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			signal: AbortSignal.timeout(5000),
+		});
+		if (!response.ok) console.warn(`Schedule tracker returned HTTP ${response.status}`);
+	} catch (err) {
+		console.warn('Failed to update schedule tracker:', err.message);
+	}
+}
+
+function verboseErrorMessage(error) {
+	if (error.cause && error.cause.message) {
+		return `${error.message}: ${error.cause.message}`;
+	}
+	return error.message;
+}
+
 export async function refreshCache() {
 	try {
 		const items = await fetchFromEolas();
@@ -211,10 +240,13 @@ export async function refreshCache() {
 			lastRefreshed: new Date(),
 			error: null,
 		};
-		console.log('Eolas cache refreshed');
+		console.log('Eolas cache refreshed successfully');
+		await reportToScheduleTracker(true);
 	} catch (error) {
-		cache.error = error.message;
-		console.error('Eolas cache refresh failed:', error.message);
+		const detail = verboseErrorMessage(error);
+		cache.error = detail;
+		console.error('Eolas cache refresh failed:', detail);
+		await reportToScheduleTracker(false, detail);
 	}
 }
 
@@ -247,4 +279,4 @@ export function stopCache() {
 }
 
 // Exported for testing
-export { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL };
+export { buildCacheFromQuads, parseRdf, verboseErrorMessage, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL };
