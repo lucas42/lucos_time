@@ -9,6 +9,7 @@ services:
       - PORT
       - KEY_LUCOS_EOLAS
       - EOLAS_URL
+      - SCHEDULE_TRACKER_ENDPOINT
     image: lucas42/lucos_time
     restart: always
     healthcheck:

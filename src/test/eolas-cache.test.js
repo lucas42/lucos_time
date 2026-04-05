@@ -1,6 +1,6 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCacheFromQuads, parseRdf, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL } from '../eolas-cache.js';
+import { buildCacheFromQuads, parseRdf, verboseErrorMessage, refreshCache, getCache, getCacheStatus, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL } from '../eolas-cache.js';
 
 const SAMPLE_TURTLE = `
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -140,5 +140,114 @@ describe('buildCacheFromQuads', () => {
 		assert.equal(cache.calendars.size, 0);
 		assert.equal(cache.festivals.length, 0);
 		assert.equal(cache.historicalEvents.size, 0);
+	});
+});
+
+describe('verboseErrorMessage', () => {
+	it('returns the message when there is no cause', () => {
+		const err = new Error('fetch failed');
+		assert.equal(verboseErrorMessage(err), 'fetch failed');
+	});
+
+	it('appends cause.message when a cause is present', () => {
+		const cause = new Error('Connection refused');
+		const err = new Error('fetch failed', { cause });
+		assert.equal(verboseErrorMessage(err), 'fetch failed: Connection refused');
+	});
+
+	it('falls back to message alone when cause has no message', () => {
+		const err = new Error('something went wrong');
+		err.cause = {};
+		assert.equal(verboseErrorMessage(err), 'something went wrong');
+	});
+});
+
+describe('refreshCache', () => {
+	let originalFetch;
+	let originalEnv;
+
+	beforeEach(() => {
+		originalFetch = globalThis.fetch;
+		originalEnv = { ...process.env };
+	});
+
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		process.env = originalEnv;
+	});
+
+	it('logs to schedule tracker on success', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example';
+		process.env.SYSTEM = 'lucos_time';
+
+		const calls = [];
+		globalThis.fetch = async (url, opts) => {
+			calls.push({ url, opts });
+			if (url.includes('/metadata/all/data/')) {
+				// Return minimal valid Turtle so parsing succeeds
+				return {
+					ok: true,
+					text: async () => '',
+				};
+			}
+			// Schedule tracker call
+			return { ok: true };
+		};
+
+		await refreshCache();
+
+		const trackerCall = calls.find(c => c.url.includes('report-status'));
+		assert.ok(trackerCall, 'Expected a call to schedule tracker');
+		const body = JSON.parse(trackerCall.opts.body);
+		assert.equal(body.status, 'success');
+		assert.equal(body.system, 'lucos_time');
+		assert.equal(body.frequency, 3600);
+	});
+
+	it('logs error to schedule tracker on fetch failure', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example';
+		process.env.SYSTEM = 'lucos_time';
+
+		const calls = [];
+		globalThis.fetch = async (url, opts) => {
+			calls.push({ url, opts });
+			if (url.includes('/metadata/all/data/')) {
+				const cause = new Error('Connection refused');
+				throw new Error('fetch failed', { cause });
+			}
+			return { ok: true };
+		};
+
+		await refreshCache();
+
+		const trackerCall = calls.find(c => c.url.includes('report-status'));
+		assert.ok(trackerCall, 'Expected a call to schedule tracker on failure');
+		const body = JSON.parse(trackerCall.opts.body);
+		assert.equal(body.status, 'error');
+		assert.ok(body.message.includes('Connection refused'), `Expected cause in message, got: ${body.message}`);
+	});
+
+	it('skips schedule tracker when SCHEDULE_TRACKER_ENDPOINT is not set', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		delete process.env.SCHEDULE_TRACKER_ENDPOINT;
+
+		const calls = [];
+		globalThis.fetch = async (url, opts) => {
+			calls.push({ url });
+			if (url.includes('/metadata/all/data/')) {
+				return { ok: true, text: async () => '' };
+			}
+			return { ok: true };
+		};
+
+		await refreshCache();
+
+		const trackerCall = calls.find(c => c.url.includes('report-status'));
+		assert.ok(!trackerCall, 'Expected no schedule tracker call when endpoint not configured');
 	});
 });

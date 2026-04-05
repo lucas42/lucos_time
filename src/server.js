@@ -2,7 +2,7 @@
  import url from 'url';
  import querystring from 'querystring';
  import http from 'http';
- import { startCache, getCache, getCacheStatus } from './eolas-cache.js';
+ import { startCache, refreshCache, getCache, getCacheStatus } from './eolas-cache.js';
  import { getCurrentItems } from './temporal-matcher.js';
 
 const port = process.env.PORT;
@@ -60,6 +60,16 @@ http.createServer(async (req, res) => {
 		case "/now":
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 			res.write(JSON.stringify(new Date().getTime()));
+			res.end();
+			break;
+		case "/refresh-eolas-cache":
+			if (req.method !== 'POST') {
+				res.sendError(405, 'Method Not Allowed');
+				break;
+			}
+			await refreshCache();
+			res.writeHead(200, {'Content-Type': 'application/json'});
+			res.write(JSON.stringify({ ok: true, status: getCacheStatus() }));
 			res.end();
 			break;
 		case "/current-items":
