@@ -101,7 +101,10 @@ http.createServer(async (req, res) => {
 					}
 				},
 				metrics: {
-					eolasLastRefreshed: eolasStatus.lastRefreshed,
+					eolasLastRefreshed: {
+						value: eolasStatus.lastRefreshed ? new Date(eolasStatus.lastRefreshed).getTime() : null,
+						techDetail: 'Timestamp of the last eolas RDF cache refresh',
+					},
 				},
 				ci: {
 					circle: "gh/lucas42/lucos_time",
