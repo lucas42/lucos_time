@@ -1,5 +1,4 @@
  import { promises as fs } from 'fs';
- import url from 'url';
  import querystring from 'querystring';
  import http from 'http';
  import { startCache, refreshCache, getCache, getCacheStatus } from './eolas-cache.js';
@@ -38,9 +37,9 @@ http.createServer(async (req, res) => {
 	if (req.headers.cookie) {
 		cookies = querystring.parse(req.headers.cookie, '; ');
 	}
-	var url_parts = url.parse(req.url, true);
+	var url_parts = new URL(req.url, 'http://localhost');
 	var path = url_parts.pathname;
-	var params = url_parts.query;
+	var params = url_parts.searchParams;
 	switch (path) {
 		case "/icon.png":
 			res.sendFile("resources/icon.png", "image/png");
