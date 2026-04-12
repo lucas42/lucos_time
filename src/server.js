@@ -91,7 +91,8 @@ http.createServer(async (req, res) => {
 				system: 'lucos_time',
 				checks: {
 					media: {
-						techDetail: `Makes HEAD request for media file from url ${testurl}`
+						techDetail: `Makes HEAD request for media file from url ${testurl}`,
+						failThreshold: 5,
 					},
 					eolas: {
 						techDetail: 'Checks whether the eolas RDF cache is populated and fresh',
