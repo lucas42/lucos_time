@@ -98,6 +98,7 @@ http.createServer(async (req, res) => {
 						techDetail: 'Checks whether the eolas RDF cache is populated and fresh',
 						ok: eolasStatus.populated,
 						debug: eolasStatus.error || undefined,
+						dependsOn: 'eolas.l42.eu',
 					}
 				},
 				metrics: {
