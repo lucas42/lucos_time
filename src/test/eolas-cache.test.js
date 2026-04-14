@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCacheFromQuads, parseRdf, verboseErrorMessage, refreshCache, getCache, getCacheStatus, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL } from '../eolas-cache.js';
+import { buildCacheFromQuads, parseRdf, verboseErrorMessage, refreshCache, getCache, getCacheStatus, _resetStartedAt, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS } from '../eolas-cache.js';
 
 const SAMPLE_TURTLE = `
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -159,6 +159,98 @@ describe('verboseErrorMessage', () => {
 		const err = new Error('something went wrong');
 		err.cause = {};
 		assert.equal(verboseErrorMessage(err), 'something went wrong');
+	});
+});
+
+describe('getCacheStatus', () => {
+	beforeEach(() => {
+		// Simulate startup is over so tests don't depend on real wall-clock timing
+		_resetStartedAt(Date.now() - STARTUP_GRACE_PERIOD_MS - 1000);
+	});
+
+	it('startingUp is true when cache is unpopulated and within grace period', () => {
+		_resetStartedAt(Date.now()); // just started
+		const status = getCacheStatus();
+		// Only startingUp if cache is still unpopulated (lastRefreshed === null)
+		// We can't force cache state from outside, but we can verify the flag logic:
+		// If populated, startingUp must be false regardless of timing
+		if (!status.populated) {
+			assert.equal(status.startingUp, true);
+		} else {
+			assert.equal(status.startingUp, false);
+		}
+	});
+
+	it('startingUp is false after grace period has elapsed', () => {
+		_resetStartedAt(Date.now() - STARTUP_GRACE_PERIOD_MS - 1000);
+		const status = getCacheStatus();
+		assert.equal(status.startingUp, false);
+	});
+
+	it('stale is false when lastRefreshed is recent', async () => {
+		// Trigger a successful refresh so lastRefreshed is set
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async (url) => {
+			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
+			return { ok: true };
+		};
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		await refreshCache();
+		globalThis.fetch = originalFetch;
+
+		const status = getCacheStatus();
+		assert.equal(status.populated, true);
+		assert.equal(status.stale, false);
+	});
+
+	it('stale is true when lastRefreshed is older than STALE_THRESHOLD_MS', async () => {
+		// Trigger a refresh, then wind back lastRefreshed via another refresh call with a mocked old date
+		const originalFetch = globalThis.fetch;
+		const originalDateNow = Date.now;
+
+		// First: do a real refresh to populate the cache
+		globalThis.fetch = async (url) => {
+			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
+			return { ok: true };
+		};
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		await refreshCache();
+		globalThis.fetch = originalFetch;
+
+		// Then: simulate that Date.now() is well past the stale threshold
+		const cache = getCache();
+		const staleTime = cache.lastRefreshed.getTime() - STALE_THRESHOLD_MS - 1000;
+		// Temporarily override Date.now so getCacheStatus sees the cache as stale
+		Date.now = () => cache.lastRefreshed.getTime() + STALE_THRESHOLD_MS + 1000;
+		const status = getCacheStatus();
+		Date.now = originalDateNow;
+
+		assert.equal(status.populated, true);
+		assert.equal(status.stale, true);
+	});
+
+	it('stale debug message is included when cache is stale', async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async (url) => {
+			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
+			return { ok: true };
+		};
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		await refreshCache();
+		globalThis.fetch = originalFetch;
+
+		const cache = getCache();
+		const originalDateNow = Date.now;
+		Date.now = () => cache.lastRefreshed.getTime() + STALE_THRESHOLD_MS + 1000;
+		const status = getCacheStatus();
+		Date.now = originalDateNow;
+
+		assert.equal(status.stale, true);
+		// The lastRefreshed string should be present for the server to include in debug
+		assert.ok(status.lastRefreshed);
 	});
 });
 
