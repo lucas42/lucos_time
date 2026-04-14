@@ -3,6 +3,8 @@ import { Parser } from 'n3';
 const EOLAS_URL = process.env.EOLAS_URL;
 const KEY_LUCOS_EOLAS = process.env.KEY_LUCOS_EOLAS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
+const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours (3× refresh interval)
 
 const EOLAS_NS = 'https://eolas.l42.eu/ontology/';
 const TIME_NS = 'http://www.w3.org/2006/time#';
@@ -203,6 +205,8 @@ let cache = {
 	error: null,
 };
 
+let startedAt = Date.now();
+
 async function reportToScheduleTracker(success, message) {
 	const endpoint = process.env.SCHEDULE_TRACKER_ENDPOINT;
 	if (!endpoint) return;
@@ -255,11 +259,21 @@ export function getCache() {
 }
 
 export function getCacheStatus() {
+	const now = Date.now();
+	const startingUp = !cache.lastRefreshed && (now - startedAt < STARTUP_GRACE_PERIOD_MS);
+	const stale = cache.lastRefreshed !== null && (now - cache.lastRefreshed.getTime() > STALE_THRESHOLD_MS);
 	return {
 		populated: cache.lastRefreshed !== null,
 		lastRefreshed: cache.lastRefreshed ? cache.lastRefreshed.toISOString() : null,
 		error: cache.error,
+		startingUp,
+		stale,
 	};
+}
+
+// For testing only — resets the startup timestamp
+export function _resetStartedAt(timestamp = Date.now()) {
+	startedAt = timestamp;
 }
 
 let refreshInterval = null;
@@ -279,4 +293,4 @@ export function stopCache() {
 }
 
 // Exported for testing
-export { buildCacheFromQuads, parseRdf, verboseErrorMessage, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL };
+export { buildCacheFromQuads, parseRdf, verboseErrorMessage, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS };
