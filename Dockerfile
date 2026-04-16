@@ -1,4 +1,6 @@
 FROM node:25-alpine
+ARG VERSION
+ENV VERSION=$VERSION
 
 WORKDIR /web/lucos/time
 
