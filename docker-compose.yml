@@ -10,7 +10,7 @@ services:
       - KEY_LUCOS_EOLAS
       - EOLAS_URL
       - SCHEDULE_TRACKER_ENDPOINT
-    image: lucas42/lucos_time
+    image: lucas42/lucos_time:${VERSION:-latest}
     restart: always
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT}/_info"]
