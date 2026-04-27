@@ -71,12 +71,13 @@ http.createServer(async (req, res) => {
 			res.write(JSON.stringify({ ok: true, status: getCacheStatus() }));
 			res.end();
 			break;
-		case "/current-items":
+		case "/current-items": {
 			const currentItemsResult = getCurrentItems(getCache().items);
 			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 			res.write(JSON.stringify(currentItemsResult));
 			res.end();
 			break;
+		}
 		case "/":
 			res.sendFile("index.xhtml", "application/xhtml+xml", function () {
 				return this.toString()
@@ -84,7 +85,7 @@ http.createServer(async (req, res) => {
 					.replace("$mediaurl$", process.env.MEDIAURL);
 			});
 			break;
-		case "/_info":
+		case "/_info": {
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
 			const eolasStatus = getCacheStatus();
 			const output = {
@@ -129,6 +130,7 @@ http.createServer(async (req, res) => {
 			res.write(JSON.stringify(output));
 			res.end();
 			break;
+		}
 		default:
 			res.sendError(404, 'File Not Found');
 	}
