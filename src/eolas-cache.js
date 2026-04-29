@@ -1,206 +1,85 @@
-import { Parser } from 'n3';
-
 const EOLAS_URL = process.env.EOLAS_URL;
 const KEY_LUCOS_EOLAS = process.env.KEY_LUCOS_EOLAS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
 const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours (3× refresh interval)
 
-const EOLAS_NS = 'https://eolas.l42.eu/ontology/';
-const TIME_NS = 'http://www.w3.org/2006/time#';
-const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
-const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
-const COMMEMORATES = 'http://www.wikidata.org/prop/direct/P547';
+function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData) {
+	const daysOfWeek = daysOfWeekData.map(d => ({
+		uri: d.uri,
+		name: d.name,
+		type: 'DayOfWeek',
+		order: d.order,
+	}));
 
-const TYPE_URIS = {
-	DayOfWeek: `${TIME_NS}DayOfWeek`,
-	Month: `${TIME_NS}MonthOfYear`,
-	Festival: `${EOLAS_NS}Festival`,
-	HistoricalEvent: `${EOLAS_NS}HistoricalEvent`,
-	Calendar: `${EOLAS_NS}Calendar`,
-};
+	const calendars = new Map(calendarsData.map(c => [c.uri, {
+		uri: c.uri,
+		name: c.name,
+	}]));
 
-const PREDICATES = {
-	orderInWeek: `${EOLAS_NS}orderInWeek`,
-	orderInCalendar: `${EOLAS_NS}orderInCalendar`,
-	calendar: `${EOLAS_NS}calendar`,
-	festivalStartsOn: `${EOLAS_NS}festivalStartsOn`,
-	timeDay: `${TIME_NS}day`,
-	timeMonthOfYear: `${TIME_NS}MonthOfYear`,
-	commemorates: COMMEMORATES,
-};
+	const months = monthsData.map(m => ({
+		uri: m.uri,
+		name: m.name,
+		type: 'Month',
+		orderInCalendar: m.order_in_calendar,
+		calendarUri: m.calendar ? m.calendar.uri : null,
+	}));
 
-function parseRdf(rdfText) {
-	return new Promise((resolve, reject) => {
-		const quads = [];
-		const parser = new Parser();
-		parser.parse(rdfText, (error, quad) => {
-			if (error) return reject(error);
-			if (quad) quads.push(quad);
-			else resolve(quads);
-		});
-	});
-}
+	const festivals = festivalsData.map(f => ({
+		uri: f.uri,
+		name: f.name,
+		type: 'Festival',
+		monthUri: f.month ? f.month.uri : null,
+		dayOfMonth: f.day_of_month !== null && f.day_of_month !== undefined ? f.day_of_month : null,
+	}));
 
-function extractValue(term) {
-	if (!term) return null;
-	return term.value;
-}
+	const historicalEvents = new Map(historicalEventsData.map(e => [e.uri, {
+		uri: e.uri,
+		name: e.name,
+		type: 'HistoricalEvent',
+	}]));
 
-function extractEntities(quads) {
-	const entities = new Map();
-
-	for (const quad of quads) {
-		const subject = quad.subject.value;
-		if (!entities.has(subject)) {
-			entities.set(subject, { uri: subject, properties: {} });
-		}
-		const entity = entities.get(subject);
-		const predicate = quad.predicate.value;
-		const value = extractValue(quad.object);
-
-		if (predicate === RDF_TYPE) {
-			if (!entity.types) entity.types = [];
-			entity.types.push(value);
-		} else if (predicate === RDFS_LABEL) {
-			entity.name = value;
-		} else {
-			entity.properties[predicate] = value;
-		}
-	}
-
-	return entities;
-}
-
-function buildCache(entities) {
-	const items = {
-		daysOfWeek: [],
-		months: [],
-		calendars: new Map(),
-		festivals: [],
-		historicalEvents: new Map(),
-	};
-
-	// First pass: identify calendars
-	for (const [uri, entity] of entities) {
-		if (entity.types && entity.types.includes(TYPE_URIS.Calendar)) {
-			items.calendars.set(uri, {
-				uri,
-				name: entity.name,
-			});
-		}
-	}
-
-	// Second pass: categorise temporal entities
-	for (const [uri, entity] of entities) {
-		if (!entity.types) continue;
-
-		if (entity.types.includes(TYPE_URIS.DayOfWeek)) {
-			items.daysOfWeek.push({
-				uri,
-				name: entity.name,
-				type: 'DayOfWeek',
-				order: parseInt(entity.properties[PREDICATES.orderInWeek], 10),
-			});
-		} else if (entity.types.includes(TYPE_URIS.Month)) {
-			const calendarUri = entity.properties[PREDICATES.calendar];
-			items.months.push({
-				uri,
-				name: entity.name,
-				type: 'Month',
-				orderInCalendar: parseInt(entity.properties[PREDICATES.orderInCalendar], 10),
-				calendarUri,
-			});
-		} else if (entity.types.includes(TYPE_URIS.Festival)) {
-			items.festivals.push({
-				uri,
-				name: entity.name,
-				type: 'Festival',
-				monthUri: entity.festivalMonthUri || null,
-				dayOfMonth: entity.festivalDayOfMonth !== undefined ? entity.festivalDayOfMonth : null,
-			});
-		} else if (entity.types.includes(TYPE_URIS.HistoricalEvent)) {
-			items.historicalEvents.set(uri, {
-				uri,
-				name: entity.name,
-				type: 'HistoricalEvent',
-			});
-		}
-	}
-
-	return items;
-}
-
-function buildCacheFromQuads(quads) {
-	const entities = extractEntities(quads);
-
-	// Resolve festival start-date blank nodes:
-	// eolas serialises as: <festival> festivalStartsOn _:b . _:b time:day N . _:b time:MonthOfYear <month> .
-	// We need to flatten this into monthUri/dayOfMonth on the festival entity.
-	const startDayBnodes = new Map(); // bnode id → { day, monthUri }
-	const festivalToBnode = new Map(); // festival uri → bnode id
-
-	for (const quad of quads) {
-		const pred = quad.predicate.value;
-		if (pred === PREDICATES.festivalStartsOn) {
-			festivalToBnode.set(quad.subject.value, quad.object.value);
-		} else if (pred === PREDICATES.timeDay) {
-			const bnode = quad.subject.value;
-			if (!startDayBnodes.has(bnode)) startDayBnodes.set(bnode, {});
-			startDayBnodes.get(bnode).day = quad.object.value;
-		} else if (pred === PREDICATES.timeMonthOfYear) {
-			const bnode = quad.subject.value;
-			if (!startDayBnodes.has(bnode)) startDayBnodes.set(bnode, {});
-			startDayBnodes.get(bnode).monthUri = quad.object.value;
-		}
-	}
-
-	// Attach resolved start-date fields to festival entities
-	for (const [festivalUri, bnodeId] of festivalToBnode) {
-		const entity = entities.get(festivalUri);
-		const startDay = startDayBnodes.get(bnodeId);
-		if (entity && startDay) {
-			entity.festivalMonthUri = startDay.monthUri || null;
-			entity.festivalDayOfMonth = startDay.day ? parseInt(startDay.day, 10) : null;
-		}
-	}
-
-	// Handle multiple commemorates relationships per festival
+	// Build commemoratesMap from festivals.
+	// commemorates is a single FK (not M2M), so each entry is an array of 0 or 1 URIs.
 	const commemoratesMap = new Map();
-	for (const quad of quads) {
-		if (quad.predicate.value === PREDICATES.commemorates) {
-			const festivalUri = quad.subject.value;
-			if (!commemoratesMap.has(festivalUri)) {
-				commemoratesMap.set(festivalUri, []);
-			}
-			commemoratesMap.get(festivalUri).push(quad.object.value);
+	for (const f of festivalsData) {
+		if (f.commemorates) {
+			commemoratesMap.set(f.uri, [f.commemorates.uri]);
 		}
 	}
 
-	const items = buildCache(entities);
-	items.commemoratesMap = commemoratesMap;
-	return items;
+	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap };
+}
+
+async function fetchTypeFromEolas(type, headers) {
+	const url = `${EOLAS_URL}/metadata/${type}/list/`;
+	const response = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+	if (!response.ok) {
+		throw new Error(`Eolas returned HTTP ${response.status} for /${type}`);
+	}
+	return response.json();
 }
 
 async function fetchFromEolas() {
-	const url = `${EOLAS_URL}/metadata/all/data/`;
 	const headers = {
 		'User-Agent': 'lucos_time',
 		'Authorization': `Key ${KEY_LUCOS_EOLAS}`,
-		'Accept': 'text/turtle',
+		'Accept': 'application/json',
 	};
 
-	const response = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
-	if (!response.ok) {
-		throw new Error(`Eolas returned HTTP ${response.status}`);
-	}
-	const rdfText = await response.text();
-	const quads = await parseRdf(rdfText);
-	return buildCacheFromQuads(quads);
+	const [daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData] = await Promise.all([
+		fetchTypeFromEolas('dayofweek', headers),
+		fetchTypeFromEolas('calendar', headers),
+		fetchTypeFromEolas('month', headers),
+		fetchTypeFromEolas('festival', headers),
+		fetchTypeFromEolas('historicalevent', headers),
+	]);
+
+	return buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData);
 }
 
 let cache = {
-	items: buildCacheFromQuads([]),
+	items: buildCacheFromJson([], [], [], [], []),
 	lastRefreshed: null,
 	error: null,
 };
@@ -293,4 +172,4 @@ export function stopCache() {
 }
 
 // Exported for testing
-export { buildCacheFromQuads, parseRdf, verboseErrorMessage, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS };
+export { buildCacheFromJson, verboseErrorMessage, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS };

@@ -1,6 +1,6 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRdf, buildCacheFromQuads } from '../eolas-cache.js';
+import { buildCacheFromJson } from '../eolas-cache.js';
 import { getCurrentItems } from '../temporal-matcher.js';
 
 const EOLAS_URL = process.env.EOLAS_URL;
@@ -8,27 +8,31 @@ const KEY_LUCOS_EOLAS = process.env.KEY_LUCOS_EOLAS;
 const canRunSmoke = EOLAS_URL && KEY_LUCOS_EOLAS;
 
 describe('Smoke test against real eolas data', { skip: !canRunSmoke && 'EOLAS_URL and KEY_LUCOS_EOLAS not set' }, () => {
-	let rdfText;
-	let quads;
 	let cacheItems;
 
 	before(async () => {
-		const response = await fetch(`${EOLAS_URL}/metadata/all/data/`, {
-			headers: {
-				'User-Agent': 'lucos_time-smoke-test',
-				'Authorization': `Key ${KEY_LUCOS_EOLAS}`,
-				'Accept': 'text/turtle',
-			},
-			signal: AbortSignal.timeout(30000),
-		});
-		assert.equal(response.ok, true, `Eolas returned HTTP ${response.status}`);
-		rdfText = await response.text();
-		quads = await parseRdf(rdfText);
-		cacheItems = buildCacheFromQuads(quads);
-	});
+		const headers = {
+			'User-Agent': 'lucos_time-smoke-test',
+			'Authorization': `Key ${KEY_LUCOS_EOLAS}`,
+			'Accept': 'application/json',
+		};
 
-	it('should parse RDF into a non-trivial number of quads', () => {
-		assert.ok(quads.length > 10, `Expected many quads, got ${quads.length}`);
+		async function fetchType(type) {
+			const url = `${EOLAS_URL}/metadata/${type}/list/`;
+			const response = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+			assert.equal(response.ok, true, `Eolas returned HTTP ${response.status} for ${type}`);
+			return response.json();
+		}
+
+		const [daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData] = await Promise.all([
+			fetchType('dayofweek'),
+			fetchType('calendar'),
+			fetchType('month'),
+			fetchType('festival'),
+			fetchType('historicalevent'),
+		]);
+
+		cacheItems = buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData);
 	});
 
 	it('should find at least 7 days of the week', () => {
