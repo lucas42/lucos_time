@@ -1,145 +1,150 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCacheFromQuads, parseRdf, verboseErrorMessage, refreshCache, getCache, getCacheStatus, _resetStartedAt, PREDICATES, TYPE_URIS, EOLAS_NS, TIME_NS, RDF_TYPE, RDFS_LABEL, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS } from '../eolas-cache.js';
+import { buildCacheFromJson, verboseErrorMessage, refreshCache, getCache, getCacheStatus, _resetStartedAt, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS } from '../eolas-cache.js';
 
-const SAMPLE_TURTLE = `
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix eolas: <https://eolas.l42.eu/ontology/> .
-@prefix time: <http://www.w3.org/2006/time#> .
-@prefix wdt: <http://www.wikidata.org/prop/direct/> .
+const CALENDAR_URI = 'https://example.com/metadata/calendar/1/';
+const MONTH_3_URI = 'https://example.com/metadata/month/3/';
+const MONTH_12_URI = 'https://example.com/metadata/month/12/';
+const FESTIVAL_1_URI = 'https://example.com/metadata/festival/1/';
+const FESTIVAL_2_URI = 'https://example.com/metadata/festival/2/';
+const HIST_EVENT_1_URI = 'https://example.com/metadata/historicalevent/1/';
 
-<https://example.com/calendar/1/>
-    rdf:type eolas:Calendar ;
-    rdfs:label "Gregorian" .
+const SAMPLE_DAYS_OF_WEEK = [
+	{ id: 1, uri: 'https://example.com/metadata/dayofweek/1/', name: 'Monday', order: 1 },
+	{ id: 7, uri: 'https://example.com/metadata/dayofweek/7/', name: 'Sunday', order: 7 },
+];
 
-<https://example.com/dayofweek/1/>
-    rdf:type time:DayOfWeek ;
-    rdfs:label "Monday" ;
-    eolas:orderInWeek 1 .
+const SAMPLE_CALENDARS = [
+	{ id: 1, uri: CALENDAR_URI, name: 'Gregorian' },
+];
 
-<https://example.com/dayofweek/7/>
-    rdf:type time:DayOfWeek ;
-    rdfs:label "Sunday" ;
-    eolas:orderInWeek 7 .
+const SAMPLE_MONTHS = [
+	{
+		id: 3, uri: MONTH_3_URI, name: 'March', order_in_calendar: 3,
+		calendar: { id: 1, uri: CALENDAR_URI, name: 'Gregorian' },
+	},
+	{
+		id: 12, uri: MONTH_12_URI, name: 'December', order_in_calendar: 12,
+		calendar: { id: 1, uri: CALENDAR_URI, name: 'Gregorian' },
+	},
+];
 
-<https://example.com/month/3/>
-    rdf:type time:MonthOfYear ;
-    rdfs:label "March" ;
-    eolas:orderInCalendar 3 ;
-    eolas:calendar <https://example.com/calendar/1/> .
+const SAMPLE_FESTIVALS = [
+	{
+		id: 1, uri: FESTIVAL_1_URI, name: 'Christmas Day',
+		day_of_month: 25,
+		month: { id: 12, uri: MONTH_12_URI, name: 'December' },
+		commemorates: { id: 1, uri: HIST_EVENT_1_URI, name: 'The Nativity of Jesus Christ' },
+	},
+	{
+		id: 2, uri: FESTIVAL_2_URI, name: 'March Month Festival',
+		day_of_month: null,
+		month: { id: 3, uri: MONTH_3_URI, name: 'March' },
+		commemorates: null,
+	},
+];
 
-<https://example.com/month/12/>
-    rdf:type time:MonthOfYear ;
-    rdfs:label "December" ;
-    eolas:orderInCalendar 12 ;
-    eolas:calendar <https://example.com/calendar/1/> .
+const SAMPLE_HISTORICAL_EVENTS = [
+	{ id: 1, uri: HIST_EVENT_1_URI, name: 'The Nativity of Jesus Christ', start_year: null, end_year: null },
+];
 
-<https://example.com/festival/1/>
-    rdf:type eolas:Festival ;
-    rdfs:label "Christmas Day" ;
-    eolas:festivalStartsOn [
-        time:day 25 ;
-        time:MonthOfYear <https://example.com/month/12/>
-    ] ;
-    wdt:P547 <https://example.com/historicalevent/1/> .
+// Mock fetch that returns sample JSON for each eolas type endpoint
+function makeMockFetch({ daysOfWeek = SAMPLE_DAYS_OF_WEEK, calendars = SAMPLE_CALENDARS, months = SAMPLE_MONTHS, festivals = SAMPLE_FESTIVALS, historicalEvents = SAMPLE_HISTORICAL_EVENTS } = {}) {
+	return async (url, opts) => {
+		if (url.includes('/metadata/dayofweek/list/')) return { ok: true, json: async () => daysOfWeek };
+		if (url.includes('/metadata/calendar/list/')) return { ok: true, json: async () => calendars };
+		if (url.includes('/metadata/month/list/')) return { ok: true, json: async () => months };
+		if (url.includes('/metadata/festival/list/')) return { ok: true, json: async () => festivals };
+		if (url.includes('/metadata/historicalevent/list/')) return { ok: true, json: async () => historicalEvents };
+		// Schedule tracker or other
+		return { ok: true };
+	};
+}
 
-<https://example.com/festival/2/>
-    rdf:type eolas:Festival ;
-    rdfs:label "March Month Festival" ;
-    eolas:festivalStartsOn [
-        time:MonthOfYear <https://example.com/month/3/>
-    ] .
-
-<https://example.com/historicalevent/1/>
-    rdf:type eolas:HistoricalEvent ;
-    rdfs:label "The Nativity of Jesus Christ" .
-`;
-
-describe('parseRdf', () => {
-	it('should parse valid Turtle RDF into quads', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		assert.ok(quads.length > 0);
-	});
-
-	it('should reject invalid RDF', async () => {
-		await assert.rejects(() => parseRdf('this is not valid rdf {{{'));
-	});
-});
-
-describe('buildCacheFromQuads', () => {
-	it('should extract DaysOfWeek from parsed RDF', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+describe('buildCacheFromJson', () => {
+	it('should extract DaysOfWeek from JSON data', () => {
+		const cache = buildCacheFromJson(SAMPLE_DAYS_OF_WEEK, [], [], [], []);
 		assert.equal(cache.daysOfWeek.length, 2);
 		const monday = cache.daysOfWeek.find(d => d.name === 'Monday');
 		assert.ok(monday);
 		assert.equal(monday.order, 1);
 		assert.equal(monday.type, 'DayOfWeek');
+		assert.equal(monday.uri, 'https://example.com/metadata/dayofweek/1/');
 	});
 
-	it('should extract Gregorian calendar', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+	it('should extract Calendars into a Map keyed by URI', () => {
+		const cache = buildCacheFromJson([], SAMPLE_CALENDARS, [], [], []);
 		assert.equal(cache.calendars.size, 1);
-		const cal = cache.calendars.get('https://example.com/calendar/1/');
+		const cal = cache.calendars.get(CALENDAR_URI);
 		assert.ok(cal);
 		assert.equal(cal.name, 'Gregorian');
 	});
 
-	it('should extract Months with calendar URIs', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+	it('should extract Months with calendarUri from nested FK dict', () => {
+		const cache = buildCacheFromJson([], [], SAMPLE_MONTHS, [], []);
 		assert.equal(cache.months.length, 2);
 		const march = cache.months.find(m => m.name === 'March');
 		assert.ok(march);
 		assert.equal(march.orderInCalendar, 3);
-		assert.equal(march.calendarUri, 'https://example.com/calendar/1/');
+		assert.equal(march.calendarUri, CALENDAR_URI);
+		assert.equal(march.type, 'Month');
 	});
 
-	it('should extract Festivals with month and day_of_month', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+	it('should extract Festivals with monthUri and dayOfMonth from nested FK dict', () => {
+		const cache = buildCacheFromJson([], [], [], SAMPLE_FESTIVALS, []);
 		assert.equal(cache.festivals.length, 2);
 		const christmas = cache.festivals.find(f => f.name === 'Christmas Day');
 		assert.ok(christmas);
 		assert.equal(christmas.dayOfMonth, 25);
-		assert.equal(christmas.monthUri, 'https://example.com/month/12/');
+		assert.equal(christmas.monthUri, MONTH_12_URI);
+		assert.equal(christmas.type, 'Festival');
 	});
 
-	it('should extract Festivals without day_of_month as null', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+	it('should set dayOfMonth to null when day_of_month is null', () => {
+		const cache = buildCacheFromJson([], [], [], SAMPLE_FESTIVALS, []);
 		const marchFest = cache.festivals.find(f => f.name === 'March Month Festival');
 		assert.ok(marchFest);
 		assert.equal(marchFest.dayOfMonth, null);
 	});
 
-	it('should extract HistoricalEvents', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
+	it('should set monthUri to null when month FK is null', () => {
+		const noMonthFestival = [
+			{ id: 3, uri: 'https://example.com/metadata/festival/3/', name: 'No Month Festival', day_of_month: null, month: null, commemorates: null },
+		];
+		const cache = buildCacheFromJson([], [], [], noMonthFestival, []);
+		assert.equal(cache.festivals[0].monthUri, null);
+	});
+
+	it('should extract HistoricalEvents into a Map keyed by URI', () => {
+		const cache = buildCacheFromJson([], [], [], [], SAMPLE_HISTORICAL_EVENTS);
 		assert.equal(cache.historicalEvents.size, 1);
-		const nativity = cache.historicalEvents.get('https://example.com/historicalevent/1/');
+		const nativity = cache.historicalEvents.get(HIST_EVENT_1_URI);
 		assert.ok(nativity);
 		assert.equal(nativity.name, 'The Nativity of Jesus Christ');
+		assert.equal(nativity.type, 'HistoricalEvent');
 	});
 
-	it('should build commemorates map from Festival to HistoricalEvent', async () => {
-		const quads = await parseRdf(SAMPLE_TURTLE);
-		const cache = buildCacheFromQuads(quads);
-		const commemorated = cache.commemoratesMap.get('https://example.com/festival/1/');
+	it('should build commemoratesMap from festivals with a commemorates FK', () => {
+		const cache = buildCacheFromJson([], [], [], SAMPLE_FESTIVALS, []);
+		const commemorated = cache.commemoratesMap.get(FESTIVAL_1_URI);
 		assert.ok(commemorated);
 		assert.equal(commemorated.length, 1);
-		assert.equal(commemorated[0], 'https://example.com/historicalevent/1/');
+		assert.equal(commemorated[0], HIST_EVENT_1_URI);
 	});
 
-	it('should handle empty quads', () => {
-		const cache = buildCacheFromQuads([]);
+	it('should not add an entry to commemoratesMap for festivals with null commemorates', () => {
+		const cache = buildCacheFromJson([], [], [], SAMPLE_FESTIVALS, []);
+		assert.equal(cache.commemoratesMap.has(FESTIVAL_2_URI), false);
+	});
+
+	it('should handle empty arrays for all types', () => {
+		const cache = buildCacheFromJson([], [], [], [], []);
 		assert.equal(cache.daysOfWeek.length, 0);
 		assert.equal(cache.months.length, 0);
 		assert.equal(cache.calendars.size, 0);
 		assert.equal(cache.festivals.length, 0);
 		assert.equal(cache.historicalEvents.size, 0);
+		assert.equal(cache.commemoratesMap.size, 0);
 	});
 });
 
@@ -188,12 +193,8 @@ describe('getCacheStatus', () => {
 	});
 
 	it('stale is false when lastRefreshed is recent', async () => {
-		// Trigger a successful refresh so lastRefreshed is set
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async (url) => {
-			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
-			return { ok: true };
-		};
+		globalThis.fetch = makeMockFetch();
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
 		await refreshCache();
@@ -205,15 +206,11 @@ describe('getCacheStatus', () => {
 	});
 
 	it('stale is true when lastRefreshed is older than STALE_THRESHOLD_MS', async () => {
-		// Trigger a refresh, then wind back lastRefreshed via another refresh call with a mocked old date
 		const originalFetch = globalThis.fetch;
 		const originalDateNow = Date.now;
 
 		// First: do a real refresh to populate the cache
-		globalThis.fetch = async (url) => {
-			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
-			return { ok: true };
-		};
+		globalThis.fetch = makeMockFetch();
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
 		await refreshCache();
@@ -221,8 +218,6 @@ describe('getCacheStatus', () => {
 
 		// Then: simulate that Date.now() is well past the stale threshold
 		const cache = getCache();
-		const staleTime = cache.lastRefreshed.getTime() - STALE_THRESHOLD_MS - 1000;
-		// Temporarily override Date.now so getCacheStatus sees the cache as stale
 		Date.now = () => cache.lastRefreshed.getTime() + STALE_THRESHOLD_MS + 1000;
 		const status = getCacheStatus();
 		Date.now = originalDateNow;
@@ -233,10 +228,7 @@ describe('getCacheStatus', () => {
 
 	it('stale debug message is included when cache is stale', async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async (url) => {
-			if (url.includes('/metadata/all/data/')) return { ok: true, text: async () => '' };
-			return { ok: true };
-		};
+		globalThis.fetch = makeMockFetch();
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
 		await refreshCache();
@@ -268,6 +260,63 @@ describe('refreshCache', () => {
 		process.env = originalEnv;
 	});
 
+	it('issues parallel requests to all five eolas type endpoints', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+
+		const urls = [];
+		globalThis.fetch = async (url, opts) => {
+			urls.push(url);
+			return { ok: true, json: async () => [] };
+		};
+
+		await refreshCache();
+
+		assert.ok(urls.some(u => u.includes('/metadata/dayofweek/list/')), 'Expected dayofweek request');
+		assert.ok(urls.some(u => u.includes('/metadata/calendar/list/')), 'Expected calendar request');
+		assert.ok(urls.some(u => u.includes('/metadata/month/list/')), 'Expected month request');
+		assert.ok(urls.some(u => u.includes('/metadata/festival/list/')), 'Expected festival request');
+		assert.ok(urls.some(u => u.includes('/metadata/historicalevent/list/')), 'Expected historicalevent request');
+	});
+
+	it('sends Authorization header in the Key scheme to all eolas endpoints', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'secret-key';
+
+		const headers = [];
+		globalThis.fetch = async (url, opts) => {
+			if (url.includes('/metadata/') && url.includes('/list/')) {
+				headers.push(opts.headers);
+			}
+			return { ok: true, json: async () => [] };
+		};
+
+		await refreshCache();
+
+		// Five endpoints — one header object per request
+		assert.equal(headers.length, 5, 'Expected one header set per eolas endpoint');
+		for (const h of headers) {
+			assert.ok(h['Authorization'], 'Authorization header should be present');
+			assert.ok(h['Authorization'].startsWith('Key '), `Expected "Key ..." header, got: ${h['Authorization']}`);
+		}
+	});
+
+	it('populates the cache with data from all five endpoints', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		globalThis.fetch = makeMockFetch();
+
+		await refreshCache();
+
+		const cache = getCache();
+		assert.equal(cache.items.daysOfWeek.length, 2);
+		assert.equal(cache.items.calendars.size, 1);
+		assert.equal(cache.items.months.length, 2);
+		assert.equal(cache.items.festivals.length, 2);
+		assert.equal(cache.items.historicalEvents.size, 1);
+		assert.equal(cache.items.commemoratesMap.size, 1);
+	});
+
 	it('logs to schedule tracker on success', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
@@ -277,12 +326,8 @@ describe('refreshCache', () => {
 		const calls = [];
 		globalThis.fetch = async (url, opts) => {
 			calls.push({ url, opts });
-			if (url.includes('/metadata/all/data/')) {
-				// Return minimal valid Turtle so parsing succeeds
-				return {
-					ok: true,
-					text: async () => '',
-				};
+			if (url.includes('/metadata/') && url.includes('/list/')) {
+				return { ok: true, json: async () => [] };
 			}
 			// Schedule tracker call
 			return { ok: true };
@@ -307,9 +352,12 @@ describe('refreshCache', () => {
 		const calls = [];
 		globalThis.fetch = async (url, opts) => {
 			calls.push({ url, opts });
-			if (url.includes('/metadata/all/data/')) {
+			if (url.includes('/metadata/dayofweek/list/')) {
 				const cause = new Error('Connection refused');
 				throw new Error('fetch failed', { cause });
+			}
+			if (url.includes('/metadata/') && url.includes('/list/')) {
+				return { ok: true, json: async () => [] };
 			}
 			return { ok: true };
 		};
@@ -323,6 +371,32 @@ describe('refreshCache', () => {
 		assert.ok(body.message.includes('Connection refused'), `Expected cause in message, got: ${body.message}`);
 	});
 
+	it('logs error when any eolas endpoint returns a non-ok status', async () => {
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example';
+
+		const calls = [];
+		globalThis.fetch = async (url, opts) => {
+			calls.push({ url, opts });
+			if (url.includes('/metadata/festival/list/')) {
+				return { ok: false, status: 403 };
+			}
+			if (url.includes('/metadata/') && url.includes('/list/')) {
+				return { ok: true, json: async () => [] };
+			}
+			return { ok: true };
+		};
+
+		await refreshCache();
+
+		const trackerCall = calls.find(c => c.url.includes('report-status'));
+		assert.ok(trackerCall, 'Expected a call to schedule tracker on failure');
+		const body = JSON.parse(trackerCall.opts.body);
+		assert.equal(body.status, 'error');
+		assert.ok(body.message.includes('403'), `Expected HTTP 403 in message, got: ${body.message}`);
+	});
+
 	it('skips schedule tracker when SCHEDULE_TRACKER_ENDPOINT is not set', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
@@ -331,8 +405,8 @@ describe('refreshCache', () => {
 		const calls = [];
 		globalThis.fetch = async (url, opts) => {
 			calls.push({ url });
-			if (url.includes('/metadata/all/data/')) {
-				return { ok: true, text: async () => '' };
+			if (url.includes('/metadata/') && url.includes('/list/')) {
+				return { ok: true, json: async () => [] };
 			}
 			return { ok: true };
 		};
