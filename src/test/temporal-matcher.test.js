@@ -14,9 +14,13 @@ function makeCache({
 }
 
 const GREGORIAN_CAL_URI = 'https://example.com/calendar/1/';
+const HEBREW_CAL_URI = 'https://example.com/calendar/hebrew/';
+const CHINESE_CAL_URI = 'https://example.com/calendar/chinese/';
+const HIJRI_CAL_URI = 'https://example.com/calendar/hijri/';
+const HINDU_CAL_URI = 'https://example.com/calendar/hindu/';
 
 function gregorianCalendars() {
-	return new Map([[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }]]);
+	return new Map([[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }]]);
 }
 
 describe('getCurrentItems', () => {
@@ -66,9 +70,9 @@ describe('getCurrentItems', () => {
 
 	describe('Gregorian Month matching', () => {
 		const months = [
-			{ uri: 'month/1', name: 'January', type: 'Month', orderInCalendar: 1, calendarUri: GREGORIAN_CAL_URI },
-			{ uri: 'month/3', name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI },
-			{ uri: 'month/12', name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI },
+			{ uri: 'month/1', name: 'January', type: 'Month', orderInCalendar: 1, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M01' },
+			{ uri: 'month/3', name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' },
+			{ uri: 'month/12', name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M12' },
 		];
 
 		it('should match March in March', () => {
@@ -89,18 +93,19 @@ describe('getCurrentItems', () => {
 			assert.equal(monthItems[0].name, 'December');
 		});
 
-		it('should not match non-Gregorian months', () => {
+		it('should not match months with no temporalMonthCode', () => {
+			// A month with no temporalMonthCode should never match (graceful skip)
 			const nonGregorianUri = 'https://example.com/calendar/2/';
-			const nonGregorianMonth = {
+			const noCodeMonth = {
 				uri: 'month/chinese/1', name: 'First Month', type: 'Month',
-				orderInCalendar: 3, calendarUri: nonGregorianUri,
+				orderInCalendar: 3, calendarUri: nonGregorianUri, temporalMonthCode: null,
 			};
 			const calendars = new Map([
-				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
-				[nonGregorianUri, { uri: nonGregorianUri, name: 'Chinese' }],
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+				[nonGregorianUri, { uri: nonGregorianUri, name: 'Chinese', temporalId: 'chinese' }],
 			]);
 			const march = new Date('2026-03-15T12:00:00Z');
-			const cache = makeCache({ months: [...months, nonGregorianMonth], calendars });
+			const cache = makeCache({ months: [...months, noCodeMonth], calendars });
 			const result = getCurrentItems(cache, march);
 			const monthItems = result.items.filter(i => i.type === 'Month');
 			assert.equal(monthItems.length, 1);
@@ -112,8 +117,8 @@ describe('getCurrentItems', () => {
 		const marchUri = 'month/3';
 		const decemberUri = 'month/12';
 		const months = [
-			{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI },
-			{ uri: decemberUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI },
+			{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' },
+			{ uri: decemberUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M12' },
 		];
 
 		it('should match a festival with matching month and no day_of_month (whole month)', () => {
@@ -165,7 +170,7 @@ describe('getCurrentItems', () => {
 	describe('HistoricalEvent transitive matching via commemorates', () => {
 		const decemberUri = 'month/12';
 		const months = [
-			{ uri: decemberUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI },
+			{ uri: decemberUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M12' },
 		];
 
 		it('should include HistoricalEvents commemorated by a current Festival', () => {
@@ -227,13 +232,21 @@ describe('getCurrentItems', () => {
 	});
 
 	describe('Response shape', () => {
-		it('should include evaluated_calendars, timezone, and as_of', () => {
+		it('should include evaluated_calendars (from calendars with temporalId), timezone, and as_of', () => {
 			const now = new Date('2026-03-25T12:00:00Z');
-			const cache = makeCache();
+			// Cache with Gregorian calendar (temporalId='gregory')
+			const cache = makeCache({ calendars: gregorianCalendars() });
 			const result = getCurrentItems(cache, now);
 			assert.deepEqual(result.evaluated_calendars, ['Gregorian']);
 			assert.equal(result.timezone, 'Europe/London');
 			assert.equal(result.as_of, now.toISOString());
+		});
+
+		it('should return empty evaluated_calendars when no calendars in cache', () => {
+			const now = new Date('2026-03-25T12:00:00Z');
+			const cache = makeCache(); // no calendars
+			const result = getCurrentItems(cache, now);
+			assert.deepEqual(result.evaluated_calendars, []);
 		});
 
 		it('should return empty items for empty cache', () => {
@@ -246,34 +259,19 @@ describe('getCurrentItems', () => {
 
 	// ─── Non-Gregorian calendar tests ────────────────────────────────────────
 
-	const HEBREW_CAL_URI = 'https://example.com/calendar/hebrew/';
-	const CHINESE_CAL_URI = 'https://example.com/calendar/chinese/';
-	const HIJRI_CAL_URI = 'https://example.com/calendar/hijri/';
-	const HINDU_CAL_URI = 'https://example.com/calendar/hindu/';
-
-	function hebrewCalendars() {
-		return new Map([
-			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
-			[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
-		]);
-	}
-
-	function chineseCalendars() {
-		return new Map([
-			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
-			[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese' }],
-		]);
-	}
-
 	describe('Hebrew calendar month matching', () => {
 		// On 2026-12-01T12:00:00Z London time, the Hebrew date is 21 Kislev 5787.
-		// In eolas Nisan-first ordering, Kislev = orderInCalendar 9.
+		// Kislev = Temporal monthCode M03 (Tishrei-first).
 		const kislevDate = new Date('2026-12-01T12:00:00Z');
+		const hebrewCalendars = () => new Map([
+			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+			[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew', temporalId: 'hebrew' }],
+		]);
 
-		it('should match Kislev (eolas order 9) in December', () => {
+		it('should match Kislev (monthCode M03) in December', () => {
 			const kislevUri = 'month/hebrew/kislev';
 			const months = [
-				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M03' },
 			];
 			const cache = makeCache({ months, calendars: hebrewCalendars() });
 			const result = getCurrentItems(cache, kislevDate);
@@ -282,11 +280,11 @@ describe('getCurrentItems', () => {
 			assert.equal(monthItems[0].name, 'Kislev');
 		});
 
-		it('should not match a Hebrew month with wrong orderInCalendar', () => {
+		it('should not match Nisan (monthCode M07) in December (Kislev season)', () => {
 			const nisanUri = 'month/hebrew/nisan';
 			const months = [
-				// Nisan is orderInCalendar 1; December is Kislev (9), so no match.
-				{ uri: nisanUri, name: 'Nisan', type: 'Month', orderInCalendar: 1, calendarUri: HEBREW_CAL_URI },
+				// Nisan is M07; December is M03 (Kislev), so no match.
+				{ uri: nisanUri, name: 'Nisan', type: 'Month', orderInCalendar: 1, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M07' },
 			];
 			const cache = makeCache({ months, calendars: hebrewCalendars() });
 			const result = getCurrentItems(cache, kislevDate);
@@ -299,7 +297,7 @@ describe('getCurrentItems', () => {
 			const kislev25Date = new Date('2026-12-05T12:00:00Z');
 			const kislevUri = 'month/hebrew/kislev';
 			const months = [
-				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M03' },
 			];
 			const festivals = [
 				{ uri: 'fest/hanukkah', name: 'Hanukkah', type: 'Festival', monthUri: kislevUri, dayOfMonth: 25 },
@@ -316,7 +314,7 @@ describe('getCurrentItems', () => {
 			const kislev24Date = new Date('2026-12-04T12:00:00Z');
 			const kislevUri = 'month/hebrew/kislev';
 			const months = [
-				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M03' },
 			];
 			const festivals = [
 				{ uri: 'fest/hanukkah', name: 'Hanukkah', type: 'Festival', monthUri: kislevUri, dayOfMonth: 25 },
@@ -327,22 +325,26 @@ describe('getCurrentItems', () => {
 			assert.equal(festItems.length, 0);
 		});
 
-		it('should include Hanukkah in evaluated_calendars', () => {
+		it('should include Hebrew in evaluated_calendars', () => {
 			const cache = makeCache({ calendars: hebrewCalendars() });
 			const result = getCurrentItems(cache, kislevDate);
 			assert.ok(result.evaluated_calendars.includes('Hebrew'), 'Hebrew should be in evaluated_calendars');
-			assert.ok(result.evaluated_calendars.includes('Gregorian'), 'Gregorian should always be present');
+			assert.ok(result.evaluated_calendars.includes('Gregorian'), 'Gregorian should also be present');
 		});
 	});
 
 	describe('Chinese calendar month matching', () => {
-		// 2026-02-17T12:00:00Z is Chinese New Year 2026 — month 1, day 1 (Zhēngyuè).
+		// 2026-02-17T12:00:00Z is Chinese New Year 2026 — month 1, day 1 (Zhēngyuè, monthCode M01).
 		const chineseNewYear = new Date('2026-02-17T12:00:00Z');
+		const chineseCalendars = () => new Map([
+			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+			[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese', temporalId: 'chinese' }],
+		]);
 
-		it('should match Chinese month 1 (Zhēngyuè) on Chinese New Year', () => {
+		it('should match Chinese month 1 (Zhēngyuè, M01) on Chinese New Year', () => {
 			const zhengyueUri = 'month/chinese/1';
 			const months = [
-				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI },
+				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI, temporalMonthCode: 'M01' },
 			];
 			const cache = makeCache({ months, calendars: chineseCalendars() });
 			const result = getCurrentItems(cache, chineseNewYear);
@@ -352,11 +354,11 @@ describe('getCurrentItems', () => {
 		});
 
 		it('should not match Chinese month 1 in May (month 3 in 2026)', () => {
-			// 2026-05-01 is Chinese month 3; month 1 should not match.
+			// 2026-05-01 is Chinese month 3 (M03); month 1 (M01) should not match.
 			const mayDate = new Date('2026-05-01T12:00:00Z');
 			const zhengyueUri = 'month/chinese/1';
 			const months = [
-				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI },
+				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI, temporalMonthCode: 'M01' },
 			];
 			const cache = makeCache({ months, calendars: chineseCalendars() });
 			const result = getCurrentItems(cache, mayDate);
@@ -372,13 +374,13 @@ describe('getCurrentItems', () => {
 	});
 
 	describe('Multiple non-Gregorian calendars in cache', () => {
-		it('should evaluate all recognised non-Gregorian calendars', () => {
+		it('should evaluate all calendars with a temporalId', () => {
 			const allCalendars = new Map([
-				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
-				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
-				[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese' }],
-				[HIJRI_CAL_URI, { uri: HIJRI_CAL_URI, name: 'Hijri' }],
-				[HINDU_CAL_URI, { uri: HINDU_CAL_URI, name: 'Hindu' }],
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew', temporalId: 'hebrew' }],
+				[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese', temporalId: 'chinese' }],
+				[HIJRI_CAL_URI, { uri: HIJRI_CAL_URI, name: 'Hijri', temporalId: 'islamic' }],
+				[HINDU_CAL_URI, { uri: HINDU_CAL_URI, name: 'Hindu', temporalId: 'indian' }],
 			]);
 			const cache = makeCache({ calendars: allCalendars });
 			const result = getCurrentItems(cache, new Date('2026-05-01T12:00:00Z'));
@@ -389,26 +391,34 @@ describe('getCurrentItems', () => {
 			assert.ok(result.evaluated_calendars.includes('Hindu'));
 		});
 
-		it('should not duplicate an item that falls in both Gregorian and non-Gregorian months', () => {
-			// An unlikely case where a single item URI appears in both Gregorian and non-Gregorian
-			// month lists — addItem's seenUris dedup should prevent duplicates.
-			const sharedFestUri = 'fest/shared';
-			const marchUri = 'month/greg/march';
-			const kislevUri = 'month/heb/kislev';
-			// 2026-12-01: London Gregorian=December, Hebrew=Kislev
+		it('should skip calendars with no temporalId', () => {
+			const mixedCalendars = new Map([
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+				['unknown-uri', { uri: 'unknown-uri', name: 'Unknown', temporalId: null }],
+			]);
+			const cache = makeCache({ calendars: mixedCalendars });
+			const result = getCurrentItems(cache, new Date('2026-05-01T12:00:00Z'));
+			assert.ok(result.evaluated_calendars.includes('Gregorian'));
+			assert.ok(!result.evaluated_calendars.includes('Unknown'));
+		});
+
+		it('should not duplicate an item matched via multiple calendars', () => {
+			// 2026-12-01: London is December (Gregorian M12) and Kislev (Hebrew M03).
+			// If a festival is linked to Kislev, it should appear once regardless.
 			const dec1 = new Date('2026-12-01T12:00:00Z');
 			const decUri = 'month/greg/december';
+			const kislevUri = 'month/heb/kislev';
 			const months = [
-				{ uri: decUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI },
-				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+				{ uri: decUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M12' },
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M03' },
 			];
-			// Festival linked to Kislev (non-Gregorian)
+			const sharedFestUri = 'fest/shared';
 			const festivals = [
 				{ uri: sharedFestUri, name: 'Shared', type: 'Festival', monthUri: kislevUri, dayOfMonth: null },
 			];
 			const allCalendars = new Map([
-				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
-				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew', temporalId: 'hebrew' }],
 			]);
 			const cache = makeCache({ months, calendars: allCalendars, festivals });
 			const result = getCurrentItems(cache, dec1);
@@ -426,8 +436,8 @@ describe('getCurrentItems', () => {
 			const marchUri = 'month/3';
 			const aprilUri = 'month/4';
 			const months = [
-				{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI },
-				{ uri: aprilUri, name: 'April', type: 'Month', orderInCalendar: 4, calendarUri: GREGORIAN_CAL_URI },
+				{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' },
+				{ uri: aprilUri, name: 'April', type: 'Month', orderInCalendar: 4, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M04' },
 			];
 			const cache = makeCache({ months, calendars: gregorianCalendars() });
 			const result = getCurrentItems(cache, lateBst);

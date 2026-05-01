@@ -15,6 +15,7 @@ function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivals
 	const calendars = new Map(calendarsData.map(c => [c.uri, {
 		uri: c.uri,
 		name: c.name,
+		temporalId: c.temporal_id || null,
 	}]));
 
 	const months = monthsData.map(m => ({
@@ -23,6 +24,7 @@ function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivals
 		type: 'Month',
 		orderInCalendar: m.order_in_calendar,
 		calendarUri: m.calendar ? m.calendar.uri : null,
+		temporalMonthCode: m.temporal_month_code || null,
 	}));
 
 	const festivals = festivalsData.map(f => ({
