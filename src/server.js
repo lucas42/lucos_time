@@ -72,10 +72,15 @@ http.createServer(async (req, res) => {
 			res.end();
 			break;
 		case "/current-items": {
-			const currentItemsResult = getCurrentItems(getCache().items);
-			res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
-			res.write(JSON.stringify(currentItemsResult));
-			res.end();
+			try {
+				const currentItemsResult = getCurrentItems(getCache().items);
+				res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
+				res.write(JSON.stringify(currentItemsResult));
+				res.end();
+			} catch (e) {
+				console.error('Error in /current-items handler:', e.message);
+				res.sendError(500, 'Internal server error');
+			}
 			break;
 		}
 		case "/":

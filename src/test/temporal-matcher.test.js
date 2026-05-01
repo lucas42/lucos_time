@@ -427,6 +427,70 @@ describe('getCurrentItems', () => {
 		});
 	});
 
+	describe('Calendar polyfill error handling', () => {
+		it('should skip a calendar that throws when evaluating, and still return results from other calendars', () => {
+			// 'bad-calendar-id' is not a valid Temporal calendar ID — withCalendar will throw.
+			const badCalUri = 'https://example.com/calendar/bad/';
+			const badCalendars = new Map([
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+				[badCalUri, { uri: badCalUri, name: 'BadCal', temporalId: 'bad-calendar-id' }],
+			]);
+			const marchUri = 'month/3';
+			const months = [
+				{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' },
+			];
+			// Use 2026-03-15 — definitely March in Gregorian
+			const march = new Date('2026-03-15T12:00:00Z');
+			const cache = makeCache({ months, calendars: badCalendars });
+
+			const messages = [];
+			const origError = console.error;
+			console.error = (...args) => messages.push(args.join(' '));
+			let result;
+			try {
+				result = getCurrentItems(cache, march);
+			} finally {
+				console.error = origError;
+			}
+
+			// Bad calendar is skipped — March still matched via Gregorian
+			const monthItems = result.items.filter(i => i.type === 'Month');
+			assert.equal(monthItems.length, 1);
+			assert.equal(monthItems[0].name, 'March');
+
+			// Bad calendar excluded from evaluated_calendars; Gregorian still present
+			assert.ok(!result.evaluated_calendars.includes('BadCal'));
+			assert.ok(result.evaluated_calendars.includes('Gregorian'));
+
+			// Error was logged naming the skipped calendar
+			assert.ok(messages.some(m => m.includes('BadCal')));
+		});
+
+		it('should return an empty items array and not crash when the only calendar throws', () => {
+			const badCalUri = 'https://example.com/calendar/bad/';
+			const badCalendars = new Map([
+				[badCalUri, { uri: badCalUri, name: 'BadCal', temporalId: 'bad-calendar-id' }],
+			]);
+			const months = [
+				{ uri: 'month/3', name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: badCalUri, temporalMonthCode: 'M03' },
+			];
+			const march = new Date('2026-03-15T12:00:00Z');
+			const cache = makeCache({ months, calendars: badCalendars });
+
+			const origError = console.error;
+			console.error = () => {};
+			let result;
+			try {
+				result = getCurrentItems(cache, march);
+			} finally {
+				console.error = origError;
+			}
+
+			assert.deepEqual(result.items, []);
+			assert.deepEqual(result.evaluated_calendars, []);
+		});
+	});
+
 	describe('London timezone handling', () => {
 		it('should use London date when UTC date differs (BST)', () => {
 			// 2026-03-29 at 23:30 UTC = 2026-03-30 00:30 BST (clocks spring forward on 29 March)
