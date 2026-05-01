@@ -244,6 +244,179 @@ describe('getCurrentItems', () => {
 		});
 	});
 
+	// ─── Non-Gregorian calendar tests ────────────────────────────────────────
+
+	const HEBREW_CAL_URI = 'https://example.com/calendar/hebrew/';
+	const CHINESE_CAL_URI = 'https://example.com/calendar/chinese/';
+	const HIJRI_CAL_URI = 'https://example.com/calendar/hijri/';
+	const HINDU_CAL_URI = 'https://example.com/calendar/hindu/';
+
+	function hebrewCalendars() {
+		return new Map([
+			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
+			[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
+		]);
+	}
+
+	function chineseCalendars() {
+		return new Map([
+			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
+			[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese' }],
+		]);
+	}
+
+	describe('Hebrew calendar month matching', () => {
+		// On 2026-12-01T12:00:00Z London time, the Hebrew date is 21 Kislev 5787.
+		// In eolas Nisan-first ordering, Kislev = orderInCalendar 9.
+		const kislevDate = new Date('2026-12-01T12:00:00Z');
+
+		it('should match Kislev (eolas order 9) in December', () => {
+			const kislevUri = 'month/hebrew/kislev';
+			const months = [
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+			];
+			const cache = makeCache({ months, calendars: hebrewCalendars() });
+			const result = getCurrentItems(cache, kislevDate);
+			const monthItems = result.items.filter(i => i.type === 'Month');
+			assert.equal(monthItems.length, 1);
+			assert.equal(monthItems[0].name, 'Kislev');
+		});
+
+		it('should not match a Hebrew month with wrong orderInCalendar', () => {
+			const nisanUri = 'month/hebrew/nisan';
+			const months = [
+				// Nisan is orderInCalendar 1; December is Kislev (9), so no match.
+				{ uri: nisanUri, name: 'Nisan', type: 'Month', orderInCalendar: 1, calendarUri: HEBREW_CAL_URI },
+			];
+			const cache = makeCache({ months, calendars: hebrewCalendars() });
+			const result = getCurrentItems(cache, kislevDate);
+			const monthItems = result.items.filter(i => i.type === 'Month');
+			assert.equal(monthItems.length, 0);
+		});
+
+		it('should match a festival with a day-of-month in Hebrew calendar (Kislev 25 = Hanukkah)', () => {
+			// 2026-12-05T12:00:00Z is Kislev 25 in the Hebrew calendar.
+			const kislev25Date = new Date('2026-12-05T12:00:00Z');
+			const kislevUri = 'month/hebrew/kislev';
+			const months = [
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+			];
+			const festivals = [
+				{ uri: 'fest/hanukkah', name: 'Hanukkah', type: 'Festival', monthUri: kislevUri, dayOfMonth: 25 },
+			];
+			const cache = makeCache({ months, calendars: hebrewCalendars(), festivals });
+			const result = getCurrentItems(cache, kislev25Date);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 1);
+			assert.equal(festItems[0].name, 'Hanukkah');
+		});
+
+		it('should not match Hanukkah on Kislev 24 (day before)', () => {
+			// 2026-12-04T12:00:00Z is Kislev 24.
+			const kislev24Date = new Date('2026-12-04T12:00:00Z');
+			const kislevUri = 'month/hebrew/kislev';
+			const months = [
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+			];
+			const festivals = [
+				{ uri: 'fest/hanukkah', name: 'Hanukkah', type: 'Festival', monthUri: kislevUri, dayOfMonth: 25 },
+			];
+			const cache = makeCache({ months, calendars: hebrewCalendars(), festivals });
+			const result = getCurrentItems(cache, kislev24Date);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 0);
+		});
+
+		it('should include Hanukkah in evaluated_calendars', () => {
+			const cache = makeCache({ calendars: hebrewCalendars() });
+			const result = getCurrentItems(cache, kislevDate);
+			assert.ok(result.evaluated_calendars.includes('Hebrew'), 'Hebrew should be in evaluated_calendars');
+			assert.ok(result.evaluated_calendars.includes('Gregorian'), 'Gregorian should always be present');
+		});
+	});
+
+	describe('Chinese calendar month matching', () => {
+		// 2026-02-17T12:00:00Z is Chinese New Year 2026 — month 1, day 1 (Zhēngyuè).
+		const chineseNewYear = new Date('2026-02-17T12:00:00Z');
+
+		it('should match Chinese month 1 (Zhēngyuè) on Chinese New Year', () => {
+			const zhengyueUri = 'month/chinese/1';
+			const months = [
+				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI },
+			];
+			const cache = makeCache({ months, calendars: chineseCalendars() });
+			const result = getCurrentItems(cache, chineseNewYear);
+			const monthItems = result.items.filter(i => i.type === 'Month');
+			assert.equal(monthItems.length, 1);
+			assert.equal(monthItems[0].name, 'Zhēngyuè');
+		});
+
+		it('should not match Chinese month 1 in May (month 3 in 2026)', () => {
+			// 2026-05-01 is Chinese month 3; month 1 should not match.
+			const mayDate = new Date('2026-05-01T12:00:00Z');
+			const zhengyueUri = 'month/chinese/1';
+			const months = [
+				{ uri: zhengyueUri, name: 'Zhēngyuè', type: 'Month', orderInCalendar: 1, calendarUri: CHINESE_CAL_URI },
+			];
+			const cache = makeCache({ months, calendars: chineseCalendars() });
+			const result = getCurrentItems(cache, mayDate);
+			const monthItems = result.items.filter(i => i.type === 'Month');
+			assert.equal(monthItems.length, 0);
+		});
+
+		it('should include Chinese in evaluated_calendars', () => {
+			const cache = makeCache({ calendars: chineseCalendars() });
+			const result = getCurrentItems(cache, chineseNewYear);
+			assert.ok(result.evaluated_calendars.includes('Chinese'));
+		});
+	});
+
+	describe('Multiple non-Gregorian calendars in cache', () => {
+		it('should evaluate all recognised non-Gregorian calendars', () => {
+			const allCalendars = new Map([
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
+				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
+				[CHINESE_CAL_URI, { uri: CHINESE_CAL_URI, name: 'Chinese' }],
+				[HIJRI_CAL_URI, { uri: HIJRI_CAL_URI, name: 'Hijri' }],
+				[HINDU_CAL_URI, { uri: HINDU_CAL_URI, name: 'Hindu' }],
+			]);
+			const cache = makeCache({ calendars: allCalendars });
+			const result = getCurrentItems(cache, new Date('2026-05-01T12:00:00Z'));
+			assert.ok(result.evaluated_calendars.includes('Gregorian'));
+			assert.ok(result.evaluated_calendars.includes('Hebrew'));
+			assert.ok(result.evaluated_calendars.includes('Chinese'));
+			assert.ok(result.evaluated_calendars.includes('Hijri'));
+			assert.ok(result.evaluated_calendars.includes('Hindu'));
+		});
+
+		it('should not duplicate an item that falls in both Gregorian and non-Gregorian months', () => {
+			// An unlikely case where a single item URI appears in both Gregorian and non-Gregorian
+			// month lists — addItem's seenUris dedup should prevent duplicates.
+			const sharedFestUri = 'fest/shared';
+			const marchUri = 'month/greg/march';
+			const kislevUri = 'month/heb/kislev';
+			// 2026-12-01: London Gregorian=December, Hebrew=Kislev
+			const dec1 = new Date('2026-12-01T12:00:00Z');
+			const decUri = 'month/greg/december';
+			const months = [
+				{ uri: decUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI },
+				{ uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI },
+			];
+			// Festival linked to Kislev (non-Gregorian)
+			const festivals = [
+				{ uri: sharedFestUri, name: 'Shared', type: 'Festival', monthUri: kislevUri, dayOfMonth: null },
+			];
+			const allCalendars = new Map([
+				[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian' }],
+				[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew' }],
+			]);
+			const cache = makeCache({ months, calendars: allCalendars, festivals });
+			const result = getCurrentItems(cache, dec1);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 1);
+		});
+	});
+
 	describe('London timezone handling', () => {
 		it('should use London date when UTC date differs (BST)', () => {
 			// 2026-03-29 at 23:30 UTC = 2026-03-30 00:30 BST (clocks spring forward on 29 March)
