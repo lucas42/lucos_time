@@ -129,23 +129,18 @@ export function getCurrentItems(cacheItems, now) {
 		return false;
 	}
 
-	// Match Festivals against FestivalPeriod records (when available) or fall back to
-	// the legacy monthUri / dayOfMonth approach for festivals without period data.
+	// Match Festivals — additive: current if day_of_month/month matches OR any FestivalPeriod matches.
+	// day_of_month/month models the festival's defining day and is always checked.
+	// FestivalPeriods model additional thematic windows and are checked independently.
+	// Both paths are checked regardless of whether periods exist.
 	for (const festival of cacheItems.festivals) {
-		const periods = cacheItems.festivalPeriods ? cacheItems.festivalPeriods.get(festival.uri) : null;
+		const dayMonthCurrent = !!(festival.monthUri &&
+			currentMonthUris.has(festival.monthUri) &&
+			(festival.dayOfMonth === null || festival.dayOfMonth === monthDayMap.get(festival.monthUri)));
 
-		if (periods && periods.length > 0) {
-			// FestivalPeriod data available: festival is current if any period matches today
-			if (periods.some(isFestivalPeriodCurrent)) {
-				addItem(festival);
-				currentFestivalUris.push(festival.uri);
-			}
-		} else {
-			// Backward-compatible fallback: no FestivalPeriod records — use monthUri / dayOfMonth
-			if (!festival.monthUri) continue;
-			if (!currentMonthUris.has(festival.monthUri)) continue;
-			const calDay = monthDayMap.get(festival.monthUri);
-			if (festival.dayOfMonth !== null && festival.dayOfMonth !== calDay) continue;
+		const periodsCurrent = (cacheItems.festivalPeriods?.get(festival.uri) ?? []).some(isFestivalPeriodCurrent);
+
+		if (dayMonthCurrent || periodsCurrent) {
 			addItem(festival);
 			currentFestivalUris.push(festival.uri);
 		}

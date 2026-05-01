@@ -673,17 +673,40 @@ describe('getCurrentItems', () => {
 			assert.equal(getCurrentItems(cache, dec25).items.filter(i => i.type === 'Festival').length, 1, 'Dec 25 should match exactly once');
 		});
 
-		it('should use fallback (monthUri/dayOfMonth) for festivals with no FestivalPeriod records', () => {
-			// Same as the original test: a festival with dayOfMonth and no periods
+		it('should match via day_of_month/month when no FestivalPeriod records exist', () => {
 			const marchUri = 'month/3';
 			const months = [{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' }];
 			const festivals = [{ uri: 'fest/ides', name: 'Ides of March', type: 'Festival', monthUri: marchUri, dayOfMonth: 15 }];
-			// festivalPeriods is empty Map — no periods for this festival
+			// festivalPeriods is empty Map — only day_of_month check applies
 			const march15 = new Date('2026-03-15T12:00:00Z');
 			const cache = makeCache({ months, calendars: gregorianCalendars(), festivals });
 			assert.equal(getCurrentItems(cache, march15).items.filter(i => i.type === 'Festival').length, 1);
 			const march14 = new Date('2026-03-14T12:00:00Z');
 			assert.equal(getCurrentItems(cache, march14).items.filter(i => i.type === 'Festival').length, 0);
+		});
+
+		it('should match via day_of_month even when FestivalPeriod records also exist (additive)', () => {
+			// Festival has day_of_month=25 (Dec 25) AND a period covering Dec 1-31.
+			// Both paths are checked independently: Dec 25 matches via both; Dec 15 matches via period only.
+			// Critically, if only an Advent period (Dec 1-24) existed, Dec 25 still matches via day_of_month.
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas', type: 'Festival', monthUri: decUri, dayOfMonth: 25 }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 1, durationDays: 31 }, // Dec 1–31 music period
+			]]]);
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+
+			// Dec 25 — matches via both day_of_month AND period (deduped to 1 item)
+			assert.equal(getCurrentItems(cache, new Date('2026-12-25T12:00:00Z')).items.filter(i => i.type === 'Festival').length, 1, 'Dec 25 should match');
+			// Dec 15 — matches via period only
+			assert.equal(getCurrentItems(cache, new Date('2026-12-15T12:00:00Z')).items.filter(i => i.type === 'Festival').length, 1, 'Dec 15 should match via period');
+
+			// Now test with ONLY an Advent period (Dec 1–24) — Dec 25 still matches via day_of_month
+			const adventOnly = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 1, durationDays: 24 }, // Dec 1–24 only
+			]]]);
+			const adventCache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods: adventOnly });
+			assert.equal(getCurrentItems(adventCache, new Date('2026-12-25T12:00:00Z')).items.filter(i => i.type === 'Festival').length, 1, 'Dec 25 should still match via day_of_month even when outside all periods');
 		});
 
 		it('should handle a FestivalPeriod with a missing calendar gracefully (no match, no crash)', () => {
