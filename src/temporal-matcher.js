@@ -48,7 +48,17 @@ export function getCurrentItems(cacheItems, now) {
 	for (const [calUri, cal] of cacheItems.calendars) {
 		if (!cal.temporalId) continue; // skip calendars without a Temporal ID
 
-		const zdt = zdtLondon.withCalendar(cal.temporalId);
+		// Eagerly probe monthCode and day so any polyfill bug throws here, not inside the inner loop.
+		// If a calendar throws, log it and skip rather than crashing the whole request.
+		let zdt;
+		try {
+			zdt = zdtLondon.withCalendar(cal.temporalId);
+			void zdt.monthCode;
+			void zdt.day;
+		} catch (e) {
+			console.error(`Skipping calendar ${cal.name} (${cal.temporalId}):`, e.message);
+			continue;
+		}
 		evaluatedCalendarNames.push(cal.name);
 
 		for (const month of cacheItems.months) {
