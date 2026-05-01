@@ -35,5 +35,8 @@
     },
     "minimatch": "^5.1.7",
     "serialize-javascript": ">=7.0.3"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
   }
 }
