@@ -9,8 +9,9 @@ function makeCache({
 	festivals = [],
 	historicalEvents = new Map(),
 	commemoratesMap = new Map(),
+	festivalPeriods = new Map(),
 } = {}) {
-	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap };
+	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap, festivalPeriods };
 }
 
 const GREGORIAN_CAL_URI = 'https://example.com/calendar/1/';
@@ -509,6 +510,197 @@ describe('getCurrentItems', () => {
 			assert.equal(monthItems.length, 1);
 			// In London at this time, it's March 30, still March
 			assert.equal(monthItems[0].name, 'March');
+		});
+	});
+
+	// ─── FestivalPeriod matching ─────────────────────────────────────────────────
+
+	describe('FestivalPeriod matching', () => {
+		const decUri = 'month/greg/december';
+		const kislevUri = 'month/heb/kislev';
+
+		const gregorianAndHebrewCalendars = () => new Map([
+			[GREGORIAN_CAL_URI, { uri: GREGORIAN_CAL_URI, name: 'Gregorian', temporalId: 'gregory' }],
+			[HEBREW_CAL_URI, { uri: HEBREW_CAL_URI, name: 'Hebrew', temporalId: 'hebrew' }],
+		]);
+
+		const decemberMonth = { uri: decUri, name: 'December', type: 'Month', orderInCalendar: 12, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M12' };
+		const kislevMonth = { uri: kislevUri, name: 'Kislev', type: 'Month', orderInCalendar: 9, calendarUri: HEBREW_CAL_URI, temporalMonthCode: 'M03' };
+
+		it('should match a one-day festival period on the exact day (Christmas Day, Dec 25)', () => {
+			// Christmas Day: Dec 25, duration 1 day
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas Day', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 25, durationDays: 1 },
+			]]]);
+			const dec25 = new Date('2026-12-25T12:00:00Z');
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			const result = getCurrentItems(cache, dec25);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 1);
+			assert.equal(festItems[0].name, 'Christmas Day');
+		});
+
+		it('should not match a one-day festival period on the day before', () => {
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas Day', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 25, durationDays: 1 },
+			]]]);
+			const dec24 = new Date('2026-12-24T12:00:00Z');
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			const result = getCurrentItems(cache, dec24);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 0);
+		});
+
+		it('should not match a one-day festival period on the day after', () => {
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas Day', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 25, durationDays: 1 },
+			]]]);
+			const dec26 = new Date('2026-12-26T12:00:00Z');
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			const result = getCurrentItems(cache, dec26);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 0);
+		});
+
+		it('should match a multi-day period throughout its range (Christmas music Dec 1-31)', () => {
+			// Dec 1, duration 31 days → Dec 1 through Dec 31
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 1, durationDays: 31 },
+			]]]);
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			// Dec 1, Dec 15, Dec 31 should all match
+			for (const dateStr of ['2026-12-01T12:00:00Z', '2026-12-15T12:00:00Z', '2026-12-31T12:00:00Z']) {
+				const result = getCurrentItems(cache, new Date(dateStr));
+				const festItems = result.items.filter(i => i.type === 'Festival');
+				assert.equal(festItems.length, 1, `Expected match on ${dateStr}`);
+			}
+		});
+
+		it('should not match a multi-day period outside its range', () => {
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 1, durationDays: 31 },
+			]]]);
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			// Nov 30 and Jan 1 should not match
+			const novUri = 'month/greg/november';
+			const novMonth = { uri: novUri, name: 'November', type: 'Month', orderInCalendar: 11, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M11' };
+			const janUri = 'month/greg/january';
+			const janMonth = { uri: janUri, name: 'January', type: 'Month', orderInCalendar: 1, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M01' };
+			const fullCache = makeCache({ months: [decemberMonth, novMonth, janMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			const nov30 = new Date('2026-11-30T12:00:00Z');
+			const jan1 = new Date('2027-01-01T12:00:00Z');
+			assert.equal(getCurrentItems(fullCache, nov30).items.filter(i => i.type === 'Festival').length, 0, 'Should not match Nov 30');
+			assert.equal(getCurrentItems(fullCache, jan1).items.filter(i => i.type === 'Festival').length, 0, 'Should not match Jan 1');
+		});
+
+		it('should match a cross-month-boundary period (Hanukkah: Kislev 25, 8 days)', () => {
+			// Hanukkah 5787: Kislev 25 (2026-12-05) through Tevet 2 (2026-12-12)
+			// On both Kislev 25 (still in Kislev) and Tevet 2 (crossed into Tevet), festival should match
+			const hanukkahUri = 'fest/hanukkah';
+			const festivals = [{ uri: hanukkahUri, name: 'Hanukkah', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[hanukkahUri, [
+				{ startMonthUri: kislevUri, startDay: 25, durationDays: 8 },
+			]]]);
+			const cache = makeCache({ months: [kislevMonth], calendars: gregorianAndHebrewCalendars(), festivals, festivalPeriods });
+
+			// Kislev 25 (day 1 of Hanukkah) — 2026-12-05
+			const kislev25 = new Date('2026-12-05T12:00:00Z');
+			assert.equal(getCurrentItems(cache, kislev25).items.filter(i => i.type === 'Festival').length, 1, 'Should match on Kislev 25');
+
+			// Tevet 2 (day 8 of Hanukkah, cross-month) — 2026-12-12
+			const tevet2 = new Date('2026-12-12T12:00:00Z');
+			assert.equal(getCurrentItems(cache, tevet2).items.filter(i => i.type === 'Festival').length, 1, 'Should match on Tevet 2 (cross-month)');
+		});
+
+		it('should not match outside a cross-month-boundary period', () => {
+			const hanukkahUri = 'fest/hanukkah';
+			const festivals = [{ uri: hanukkahUri, name: 'Hanukkah', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[hanukkahUri, [
+				{ startMonthUri: kislevUri, startDay: 25, durationDays: 8 },
+			]]]);
+			const cache = makeCache({ months: [kislevMonth], calendars: gregorianAndHebrewCalendars(), festivals, festivalPeriods });
+
+			// Kislev 24 (day before Hanukkah) — 2026-12-04
+			const kislev24 = new Date('2026-12-04T12:00:00Z');
+			assert.equal(getCurrentItems(cache, kislev24).items.filter(i => i.type === 'Festival').length, 0, 'Should not match on Kislev 24');
+
+			// Tevet 3 (day after Hanukkah) — 2026-12-13
+			const tevet3 = new Date('2026-12-13T12:00:00Z');
+			assert.equal(getCurrentItems(cache, tevet3).items.filter(i => i.type === 'Festival').length, 0, 'Should not match on Tevet 3');
+		});
+
+		it('should match a festival with a whole-month period (startDay null)', () => {
+			const marchUri = 'month/greg/march';
+			const marchMonth = { uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' };
+			const festUri = 'fest/march-fest';
+			const festivals = [{ uri: festUri, name: 'March Festival', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[festUri, [
+				{ startMonthUri: marchUri, startDay: null, durationDays: null },
+			]]]);
+			const march15 = new Date('2026-03-15T12:00:00Z');
+			const cache = makeCache({ months: [marchMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			const result = getCurrentItems(cache, march15);
+			const festItems = result.items.filter(i => i.type === 'Festival');
+			assert.equal(festItems.length, 1);
+			assert.equal(festItems[0].name, 'March Festival');
+		});
+
+		it('should match the correct period when a festival has multiple periods (Christmas Day vs Christmas music)', () => {
+			// Christmas Day: Dec 25 only (durationDays 1)
+			// Christmas music: Dec 1-31 (durationDays 31)
+			const christmasUri = 'fest/christmas';
+			const festivals = [{ uri: christmasUri, name: 'Christmas', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[christmasUri, [
+				{ startMonthUri: decUri, startDay: 25, durationDays: 1 },
+				{ startMonthUri: decUri, startDay: 1, durationDays: 31 },
+			]]]);
+			const cache = makeCache({ months: [decemberMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			// Dec 1 — music period matches, Day period does not
+			const dec1 = new Date('2026-12-01T12:00:00Z');
+			assert.equal(getCurrentItems(cache, dec1).items.filter(i => i.type === 'Festival').length, 1, 'Dec 1 should match via music period');
+			// Dec 25 — both periods match (deduplicated to one item)
+			const dec25 = new Date('2026-12-25T12:00:00Z');
+			assert.equal(getCurrentItems(cache, dec25).items.filter(i => i.type === 'Festival').length, 1, 'Dec 25 should match exactly once');
+		});
+
+		it('should use fallback (monthUri/dayOfMonth) for festivals with no FestivalPeriod records', () => {
+			// Same as the original test: a festival with dayOfMonth and no periods
+			const marchUri = 'month/3';
+			const months = [{ uri: marchUri, name: 'March', type: 'Month', orderInCalendar: 3, calendarUri: GREGORIAN_CAL_URI, temporalMonthCode: 'M03' }];
+			const festivals = [{ uri: 'fest/ides', name: 'Ides of March', type: 'Festival', monthUri: marchUri, dayOfMonth: 15 }];
+			// festivalPeriods is empty Map — no periods for this festival
+			const march15 = new Date('2026-03-15T12:00:00Z');
+			const cache = makeCache({ months, calendars: gregorianCalendars(), festivals });
+			assert.equal(getCurrentItems(cache, march15).items.filter(i => i.type === 'Festival').length, 1);
+			const march14 = new Date('2026-03-14T12:00:00Z');
+			assert.equal(getCurrentItems(cache, march14).items.filter(i => i.type === 'Festival').length, 0);
+		});
+
+		it('should handle a FestivalPeriod with a missing calendar gracefully (no match, no crash)', () => {
+			// Period references a month whose calendarUri isn't in the calendar map
+			const unknownCalUri = 'cal/unknown';
+			const orphanMonthUri = 'month/orphan';
+			const orphanMonth = { uri: orphanMonthUri, name: 'OrphanMonth', type: 'Month', orderInCalendar: 1, calendarUri: unknownCalUri, temporalMonthCode: 'M01' };
+			const festUri = 'fest/orphan';
+			const festivals = [{ uri: festUri, name: 'Orphan Festival', type: 'Festival', monthUri: null, dayOfMonth: null }];
+			const festivalPeriods = new Map([[festUri, [
+				{ startMonthUri: orphanMonthUri, startDay: 1, durationDays: 1 },
+			]]]);
+			const now = new Date('2026-03-01T12:00:00Z');
+			const cache = makeCache({ months: [orphanMonth], calendars: gregorianCalendars(), festivals, festivalPeriods });
+			// Should not crash, and festival should not be matched
+			const result = getCurrentItems(cache, now);
+			assert.equal(result.items.filter(i => i.type === 'Festival').length, 0);
 		});
 	});
 });
