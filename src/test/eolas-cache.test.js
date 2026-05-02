@@ -7,6 +7,7 @@ const MONTH_3_URI = 'https://example.com/metadata/month/3/';
 const MONTH_12_URI = 'https://example.com/metadata/month/12/';
 const FESTIVAL_1_URI = 'https://example.com/metadata/festival/1/';
 const FESTIVAL_2_URI = 'https://example.com/metadata/festival/2/';
+const FESTIVAL_PERIOD_1_URI = 'https://example.com/metadata/festivalperiod/1/';
 const HIST_EVENT_1_URI = 'https://example.com/metadata/historicalevent/1/';
 
 const SAMPLE_DAYS_OF_WEEK = [
@@ -48,14 +49,25 @@ const SAMPLE_HISTORICAL_EVENTS = [
 	{ id: 1, uri: HIST_EVENT_1_URI, name: 'The Nativity of Jesus Christ', start_year: null, end_year: null },
 ];
 
+const SAMPLE_FESTIVAL_PERIODS = [
+	{
+		id: 1, uri: FESTIVAL_PERIOD_1_URI, name: 'Christmas Day',
+		festival: { id: 1, uri: FESTIVAL_1_URI, name: 'Christmas Day' },
+		start_day: 25,
+		start_month: { id: 12, uri: MONTH_12_URI, name: 'December' },
+		duration_days: 1,
+	},
+];
+
 // Mock fetch that returns sample JSON for each eolas type endpoint
-function makeMockFetch({ daysOfWeek = SAMPLE_DAYS_OF_WEEK, calendars = SAMPLE_CALENDARS, months = SAMPLE_MONTHS, festivals = SAMPLE_FESTIVALS, historicalEvents = SAMPLE_HISTORICAL_EVENTS } = {}) {
+function makeMockFetch({ daysOfWeek = SAMPLE_DAYS_OF_WEEK, calendars = SAMPLE_CALENDARS, months = SAMPLE_MONTHS, festivals = SAMPLE_FESTIVALS, historicalEvents = SAMPLE_HISTORICAL_EVENTS, festivalPeriods = SAMPLE_FESTIVAL_PERIODS } = {}) {
 	return async (url, opts) => {
 		if (url.includes('/metadata/dayofweek/list/')) return { ok: true, json: async () => daysOfWeek };
 		if (url.includes('/metadata/calendar/list/')) return { ok: true, json: async () => calendars };
 		if (url.includes('/metadata/month/list/')) return { ok: true, json: async () => months };
 		if (url.includes('/metadata/festival/list/')) return { ok: true, json: async () => festivals };
 		if (url.includes('/metadata/historicalevent/list/')) return { ok: true, json: async () => historicalEvents };
+		if (url.includes('/metadata/festivalperiod/list/')) return { ok: true, json: async () => festivalPeriods };
 		// Schedule tracker or other
 		return { ok: true };
 	};
@@ -145,6 +157,58 @@ describe('buildCacheFromJson', () => {
 		assert.equal(cache.festivals.length, 0);
 		assert.equal(cache.historicalEvents.size, 0);
 		assert.equal(cache.commemoratesMap.size, 0);
+		assert.equal(cache.festivalPeriods.size, 0);
+	});
+
+	it('should build festivalPeriods map keyed by festival URI', () => {
+		const cache = buildCacheFromJson([], [], [], [], [], SAMPLE_FESTIVAL_PERIODS);
+		assert.equal(cache.festivalPeriods.size, 1);
+		const periods = cache.festivalPeriods.get(FESTIVAL_1_URI);
+		assert.ok(periods, 'Expected periods for festival 1');
+		assert.equal(periods.length, 1);
+		assert.equal(periods[0].startMonthUri, MONTH_12_URI);
+		assert.equal(periods[0].startDay, 25);
+		assert.equal(periods[0].durationDays, 1);
+	});
+
+	it('should group multiple periods under the same festival URI', () => {
+		const multiPeriods = [
+			{
+				id: 1, uri: FESTIVAL_PERIOD_1_URI, name: 'Christmas Day',
+				festival: { id: 1, uri: FESTIVAL_1_URI, name: 'Christmas Day' },
+				start_day: 25, start_month: { id: 12, uri: MONTH_12_URI, name: 'December' }, duration_days: 1,
+			},
+			{
+				id: 2, uri: 'https://example.com/metadata/festivalperiod/2/', name: 'Christmas Music',
+				festival: { id: 1, uri: FESTIVAL_1_URI, name: 'Christmas Day' },
+				start_day: 1, start_month: { id: 12, uri: MONTH_12_URI, name: 'December' }, duration_days: 31,
+			},
+		];
+		const cache = buildCacheFromJson([], [], [], [], [], multiPeriods);
+		const periods = cache.festivalPeriods.get(FESTIVAL_1_URI);
+		assert.ok(periods);
+		assert.equal(periods.length, 2);
+	});
+
+	it('should handle festival periods with null start_month (startMonthUri becomes null)', () => {
+		const noMonthPeriod = [
+			{
+				id: 3, uri: 'https://example.com/metadata/festivalperiod/3/', name: 'No Month Period',
+				festival: { id: 2, uri: FESTIVAL_2_URI, name: 'March Month Festival' },
+				start_day: null, start_month: null, duration_days: null,
+			},
+		];
+		const cache = buildCacheFromJson([], [], [], [], [], noMonthPeriod);
+		const periods = cache.festivalPeriods.get(FESTIVAL_2_URI);
+		assert.ok(periods);
+		assert.equal(periods[0].startMonthUri, null);
+		assert.equal(periods[0].startDay, null);
+		assert.equal(periods[0].durationDays, null);
+	});
+
+	it('should return empty festivalPeriods map when no periods are provided', () => {
+		const cache = buildCacheFromJson([], [], [], [], [], []);
+		assert.equal(cache.festivalPeriods.size, 0);
 	});
 });
 
@@ -260,7 +324,7 @@ describe('refreshCache', () => {
 		process.env = originalEnv;
 	});
 
-	it('issues parallel requests to all five eolas type endpoints', async () => {
+	it('issues parallel requests to all six eolas type endpoints', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
 
@@ -277,6 +341,7 @@ describe('refreshCache', () => {
 		assert.ok(urls.some(u => u.includes('/metadata/month/list/')), 'Expected month request');
 		assert.ok(urls.some(u => u.includes('/metadata/festival/list/')), 'Expected festival request');
 		assert.ok(urls.some(u => u.includes('/metadata/historicalevent/list/')), 'Expected historicalevent request');
+		assert.ok(urls.some(u => u.includes('/metadata/festivalperiod/list/')), 'Expected festivalperiod request');
 	});
 
 	it('sends Authorization header in the Key scheme to all eolas endpoints', async () => {
@@ -293,15 +358,15 @@ describe('refreshCache', () => {
 
 		await refreshCache();
 
-		// Five endpoints — one header object per request
-		assert.equal(headers.length, 5, 'Expected one header set per eolas endpoint');
+		// Six endpoints — one header object per request
+		assert.equal(headers.length, 6, 'Expected one header set per eolas endpoint');
 		for (const h of headers) {
 			assert.ok(h['Authorization'], 'Authorization header should be present');
 			assert.ok(h['Authorization'].startsWith('Key '), `Expected "Key ..." header, got: ${h['Authorization']}`);
 		}
 	});
 
-	it('populates the cache with data from all five endpoints', async () => {
+	it('populates the cache with data from all six endpoints', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
 		globalThis.fetch = makeMockFetch();
@@ -315,6 +380,7 @@ describe('refreshCache', () => {
 		assert.equal(cache.items.festivals.length, 2);
 		assert.equal(cache.items.historicalEvents.size, 1);
 		assert.equal(cache.items.commemoratesMap.size, 1);
+		assert.equal(cache.items.festivalPeriods.size, 1);
 	});
 
 	it('logs to schedule tracker on success', async () => {

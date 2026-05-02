@@ -4,7 +4,7 @@ const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
 const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours (3× refresh interval)
 
-function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData) {
+function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData, festivalPeriodsData = []) {
 	const daysOfWeek = daysOfWeekData.map(d => ({
 		uri: d.uri,
 		name: d.name,
@@ -50,7 +50,21 @@ function buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivals
 		}
 	}
 
-	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap };
+	// Build festivalPeriods: Map<festivalUri, [{startMonthUri, startDay, durationDays}]>
+	// Each festival can have zero or more temporal periods from lucos_eolas FestivalPeriod records.
+	const festivalPeriods = new Map();
+	for (const fp of festivalPeriodsData) {
+		const festivalUri = fp.festival ? fp.festival.uri : null;
+		if (!festivalUri) continue;
+		if (!festivalPeriods.has(festivalUri)) festivalPeriods.set(festivalUri, []);
+		festivalPeriods.get(festivalUri).push({
+			startMonthUri: fp.start_month ? fp.start_month.uri : null,
+			startDay: fp.start_day !== null && fp.start_day !== undefined ? fp.start_day : null,
+			durationDays: fp.duration_days !== null && fp.duration_days !== undefined ? fp.duration_days : null,
+		});
+	}
+
+	return { daysOfWeek, months, calendars, festivals, historicalEvents, commemoratesMap, festivalPeriods };
 }
 
 async function fetchTypeFromEolas(type, headers) {
@@ -69,15 +83,16 @@ async function fetchFromEolas() {
 		'Accept': 'application/json',
 	};
 
-	const [daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData] = await Promise.all([
+	const [daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData, festivalPeriodsData] = await Promise.all([
 		fetchTypeFromEolas('dayofweek', headers),
 		fetchTypeFromEolas('calendar', headers),
 		fetchTypeFromEolas('month', headers),
 		fetchTypeFromEolas('festival', headers),
 		fetchTypeFromEolas('historicalevent', headers),
+		fetchTypeFromEolas('festivalperiod', headers),
 	]);
 
-	return buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData);
+	return buildCacheFromJson(daysOfWeekData, calendarsData, monthsData, festivalsData, historicalEventsData, festivalPeriodsData);
 }
 
 let cache = {
