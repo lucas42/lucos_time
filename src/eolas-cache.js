@@ -113,7 +113,7 @@ async function reportToScheduleTracker(success, message) {
 		...(message && { message }),
 	};
 	try {
-		const response = await fetch(`${endpoint}/report-status`, {
+		const response = await fetch(endpoint, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
