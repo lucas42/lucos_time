@@ -78,7 +78,7 @@ async function fetchTypeFromEolas(type, headers) {
 
 async function fetchFromEolas() {
 	const headers = {
-		'User-Agent': 'lucos_time',
+		'User-Agent': process.env.SYSTEM || 'lucos_time',
 		'Authorization': `Key ${KEY_LUCOS_EOLAS}`,
 		'Accept': 'application/json',
 	};
@@ -115,7 +115,10 @@ async function reportToScheduleTracker(success, message) {
 	try {
 		const response = await fetch(endpoint, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': process.env.SYSTEM || 'lucos_time',
+			},
 			body: JSON.stringify(payload),
 			signal: AbortSignal.timeout(5000),
 		});

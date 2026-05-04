@@ -406,6 +406,8 @@ describe('refreshCache', () => {
 		// Regression guard: SCHEDULE_TRACKER_ENDPOINT already contains /report-status,
 		// so the URL must not be doubled to /report-status/report-status.
 		assert.equal(trackerCall.url, 'http://tracker.example/report-status', 'URL must not double the /report-status path');
+		// ADR-0001: User-Agent must be set to the SYSTEM env var value.
+		assert.equal(trackerCall.opts.headers['User-Agent'], 'lucos_time', 'User-Agent must be set per ADR-0001');
 		const body = JSON.parse(trackerCall.opts.body);
 		assert.equal(body.status, 'success');
 		assert.equal(body.system, 'lucos_time');
