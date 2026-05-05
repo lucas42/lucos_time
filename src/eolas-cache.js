@@ -1,6 +1,7 @@
 const EOLAS_URL = process.env.EOLAS_URL;
 const KEY_LUCOS_EOLAS = process.env.KEY_LUCOS_EOLAS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — used when cache is empty after a failed fetch
 const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
 const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours (3× refresh interval)
 
@@ -175,21 +176,44 @@ export function _resetStartedAt(timestamp = Date.now()) {
 	startedAt = timestamp;
 }
 
+// For testing only — resets the cache to its initial (unpopulated) state
+export function _resetCache() {
+	cache = {
+		items: buildCacheFromJson([], [], [], [], []),
+		lastRefreshed: null,
+		error: null,
+	};
+}
+
 let refreshInterval = null;
+
+// Returns the interval to use for the next scheduled refresh.
+// Uses RETRY_INTERVAL_MS when the cache has never been successfully populated,
+// so a startup failure self-heals within minutes rather than waiting a full hour.
+export function _getNextRefreshIntervalMs() {
+	return cache.lastRefreshed !== null ? REFRESH_INTERVAL_MS : RETRY_INTERVAL_MS;
+}
+
+function scheduleNextRefresh() {
+	refreshInterval = setTimeout(async () => {
+		await refreshCache();
+		scheduleNextRefresh();
+	}, _getNextRefreshIntervalMs());
+}
 
 export async function startCache() {
 	if (!EOLAS_URL) throw new Error("'EOLAS_URL' environment variable not set");
 	if (!KEY_LUCOS_EOLAS) throw new Error("'KEY_LUCOS_EOLAS' environment variable not set");
 	await refreshCache();
-	refreshInterval = setInterval(refreshCache, REFRESH_INTERVAL_MS);
+	scheduleNextRefresh();
 }
 
 export function stopCache() {
 	if (refreshInterval) {
-		clearInterval(refreshInterval);
+		clearTimeout(refreshInterval);
 		refreshInterval = null;
 	}
 }
 
 // Exported for testing
-export { buildCacheFromJson, verboseErrorMessage, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS };
+export { buildCacheFromJson, verboseErrorMessage, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS, RETRY_INTERVAL_MS, REFRESH_INTERVAL_MS };
