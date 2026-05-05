@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCacheFromJson, verboseErrorMessage, refreshCache, getCache, getCacheStatus, _resetStartedAt, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS } from '../eolas-cache.js';
+import { buildCacheFromJson, verboseErrorMessage, refreshCache, getCache, getCacheStatus, startCache, stopCache, _resetStartedAt, _resetCache, _getNextRefreshIntervalMs, STARTUP_GRACE_PERIOD_MS, STALE_THRESHOLD_MS, RETRY_INTERVAL_MS, REFRESH_INTERVAL_MS } from '../eolas-cache.js';
 
 const CALENDAR_URI = 'https://example.com/metadata/calendar/1/';
 const MONTH_3_URI = 'https://example.com/metadata/month/3/';
@@ -486,5 +486,50 @@ describe('refreshCache', () => {
 
 		const trackerCall = calls.find(c => c.url.includes('report-status'));
 		assert.ok(!trackerCall, 'Expected no schedule tracker call when endpoint not configured');
+	});
+});
+
+describe('retry interval selection', () => {
+	let originalFetch;
+	let originalEnv;
+
+	beforeEach(() => {
+		originalFetch = globalThis.fetch;
+		originalEnv = { ...process.env };
+		process.env.EOLAS_URL = 'http://eolas.example';
+		process.env.KEY_LUCOS_EOLAS = 'test-key';
+	});
+
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		process.env = originalEnv;
+	});
+
+	it('RETRY_INTERVAL_MS is shorter than REFRESH_INTERVAL_MS', () => {
+		assert.ok(RETRY_INTERVAL_MS < REFRESH_INTERVAL_MS,
+			'Retry interval must be shorter than normal refresh interval for self-healing to work');
+	});
+
+	// _getNextRefreshIntervalMs is tested via refreshCache rather than startCache because
+	// EOLAS_URL is captured at module load time (as undefined in tests), so the guard in
+	// startCache always throws. Calling refreshCache directly exercises the same cache state.
+
+	it('returns RETRY_INTERVAL_MS when cache has never been successfully populated (startup failure)', async () => {
+		// Reset to initial empty state (previous tests may have populated lastRefreshed)
+		_resetCache();
+		// Make fetch fail so lastRefreshed stays null
+		globalThis.fetch = async () => { throw new Error('Connection refused'); };
+		await refreshCache();
+		assert.equal(getCache().lastRefreshed, null, 'Cache should still be empty after failed fetch');
+		assert.equal(_getNextRefreshIntervalMs(), RETRY_INTERVAL_MS,
+			'Should use short retry interval when cache is empty');
+	});
+
+	it('returns REFRESH_INTERVAL_MS when cache has been successfully populated', async () => {
+		globalThis.fetch = makeMockFetch();
+		await refreshCache();
+		assert.notEqual(getCache().lastRefreshed, null, 'Cache should be populated after successful fetch');
+		assert.equal(_getNextRefreshIntervalMs(), REFRESH_INTERVAL_MS,
+			'Should use normal interval once cache is populated');
 	});
 });
