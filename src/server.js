@@ -1,8 +1,8 @@
  import { promises as fs } from 'fs';
  import querystring from 'querystring';
  import http from 'http';
- import { startCache, refreshCache, getCache, getCacheStatus } from './eolas-cache.js';
- import { startContactsCache, getContactsEvents, getContactsCacheStatus } from './contacts-cache.js';
+ import { startCache as startEolasCache, refreshCache as refreshEolasCache, getCache as getEolasCache, getCacheStatus as getEolasCacheStatus } from './eolas-cache.js';
+ import { startContactsCache, getContactsItems, getContactsCacheStatus } from './contacts-cache.js';
  import { getCurrentItems } from './temporal-matcher.js';
 
 const port = process.env.PORT;
@@ -67,24 +67,15 @@ http.createServer(async (req, res) => {
 				res.sendError(405, 'Method Not Allowed');
 				break;
 			}
-			await refreshCache();
+			await refreshEolasCache();
 			res.writeHead(200, {'Content-Type': 'application/json'});
-			res.write(JSON.stringify({ ok: true, status: getCacheStatus() }));
+			res.write(JSON.stringify({ ok: true, status: getEolasCacheStatus() }));
 			res.end();
 			break;
 		case "/current-items": {
 			try {
-				const currentItemsResult = getCurrentItems(getCache().items);
-				const contactsBaseUrl = process.env.LUCOS_CONTACTS_URL || '';
-				const seenUriTypes = new Set(currentItemsResult.items.map(i => `${i.uri}::${i.type}`));
-				for (const event of getContactsEvents()) {
-					const uri = `${contactsBaseUrl}${event.person_uri}`;
-					const key = `${uri}::${event.type}`;
-					if (!seenUriTypes.has(key)) {
-						seenUriTypes.add(key);
-						currentItemsResult.items.push({ uri, name: event.person_name, type: event.type });
-					}
-				}
+				const currentItemsResult = getCurrentItems(getEolasCache().items);
+				currentItemsResult.items.push(...getContactsItems());
 				res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 				res.write(JSON.stringify(currentItemsResult));
 				res.end();
@@ -103,7 +94,7 @@ http.createServer(async (req, res) => {
 			break;
 		case "/_info": {
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
-			const eolasStatus = getCacheStatus();
+			const eolasStatus = getEolasCacheStatus();
 			const contactsStatus = getContactsCacheStatus();
 			const output = {
 				system: 'lucos_time',
@@ -121,9 +112,11 @@ http.createServer(async (req, res) => {
 						dependsOn: 'lucos_eolas',
 					},
 					contacts: {
-						techDetail: 'Checks whether the contacts events cache is populated',
-						ok: contactsStatus.populated,
-						debug: contactsStatus.error || undefined,
+						techDetail: 'Checks whether the contacts events cache is populated and fresh',
+						ok: contactsStatus.startingUp || (contactsStatus.populated && !contactsStatus.stale),
+						debug: contactsStatus.stale
+							? `Cache is stale: last refreshed ${contactsStatus.lastRefreshed}`
+							: (contactsStatus.error || undefined),
 						dependsOn: 'lucos_contacts',
 					},
 				},
@@ -166,7 +159,7 @@ http.createServer(async (req, res) => {
 console.log('Server running at http://127.0.0.1:'+port+'/');
 
 // Start eolas cache in the background (non-blocking)
-startCache().catch(err => { console.error(err.message); process.exit(1); });
+startEolasCache().catch(err => { console.error(err.message); process.exit(1); });
 
 // Start contacts cache in the background (non-blocking)
 startContactsCache().catch(err => { console.error(err.message); process.exit(1); });

@@ -1,6 +1,8 @@
 const CONTACTS_URL = process.env.LUCOS_CONTACTS_URL;
 const KEY_LUCOS_CONTACTS = process.env.KEY_LUCOS_CONTACTS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
+const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours (3× refresh interval)
 
 let cache = {
 	events: [],
@@ -8,11 +10,13 @@ let cache = {
 	error: null,
 };
 
+let startedAt = Date.now();
+
 async function fetchFromContacts() {
 	const response = await fetch(`${CONTACTS_URL}/events/today`, {
 		headers: {
 			'User-Agent': process.env.SYSTEM || 'lucos_time',
-			'Authorization': `Key ${KEY_LUCOS_CONTACTS}`,
+			'Authorization': `Bearer ${KEY_LUCOS_CONTACTS}`,
 			'Accept': 'application/json',
 		},
 		signal: AbortSignal.timeout(30000),
@@ -38,11 +42,24 @@ export function getContactsEvents() {
 	return cache.events;
 }
 
+export function getContactsItems() {
+	return cache.events.map(event => ({
+		uri: `${CONTACTS_URL}${event.person_uri}`,
+		name: event.person_name,
+		type: event.type,
+	}));
+}
+
 export function getContactsCacheStatus() {
+	const now = Date.now();
+	const startingUp = !cache.lastRefreshed && (now - startedAt < STARTUP_GRACE_PERIOD_MS);
+	const stale = cache.lastRefreshed !== null && (now - cache.lastRefreshed.getTime() > STALE_THRESHOLD_MS);
 	return {
 		populated: cache.lastRefreshed !== null,
 		lastRefreshed: cache.lastRefreshed ? cache.lastRefreshed.toISOString() : null,
 		error: cache.error,
+		startingUp,
+		stale,
 	};
 }
 
@@ -72,6 +89,7 @@ export function stopContactsCache() {
 // For testing only — resets the cache to its initial (unpopulated) state
 export function _resetContactsCache() {
 	cache = { events: [], lastRefreshed: null, error: null };
+	startedAt = Date.now();
 }
 
 // Exported for testing
