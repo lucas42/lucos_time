@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { refreshContactsCache, getContactsEvents, getContactsCacheStatus, stopContactsCache, _resetContactsCache, REFRESH_INTERVAL_MS } from '../contacts-cache.js';
+import { refreshContactsCache, getContactsEvents, getContactsItems, getContactsCacheStatus, stopContactsCache, _resetContactsCache, REFRESH_INTERVAL_MS } from '../contacts-cache.js';
 
 const CONTACTS_URL = process.env.LUCOS_CONTACTS_URL;
 const KEY_LUCOS_CONTACTS = process.env.KEY_LUCOS_CONTACTS;
@@ -118,6 +118,31 @@ describe('contacts-cache', () => {
 			// between test runs (each test file runs in its own context)
 			const events = getContactsEvents();
 			assert.ok(Array.isArray(events));
+		});
+	});
+
+	describe('getContactsItems', () => {
+		it('returns empty array before any fetch', () => {
+			const items = getContactsItems();
+			assert.ok(Array.isArray(items));
+			assert.equal(items.length, 0);
+		});
+
+		it('maps events to {uri, name, type} with absolute URI', async () => {
+			mock.method(global, 'fetch', async () => ({
+				ok: true,
+				json: async () => SAMPLE_EVENTS,
+			}));
+
+			await refreshContactsCache();
+			const items = getContactsItems();
+			assert.equal(items.length, 2);
+			assert.ok(items[0].uri.endsWith('/people/42'), `Expected URI to end with /people/42, got: ${items[0].uri}`);
+			assert.equal(items[0].name, 'Alice Smith');
+			assert.equal(items[0].type, 'birthday');
+			assert.ok(items[1].uri.endsWith('/people/17'));
+			assert.equal(items[1].name, 'Bob Jones');
+			assert.equal(items[1].type, 'anniversary');
 		});
 	});
 
