@@ -2,6 +2,7 @@
  import querystring from 'querystring';
  import http from 'http';
  import { startCache, refreshCache, getCache, getCacheStatus } from './eolas-cache.js';
+ import { startContactsCache, getContactsEvents, getContactsCacheStatus } from './contacts-cache.js';
  import { getCurrentItems } from './temporal-matcher.js';
 
 const port = process.env.PORT;
@@ -74,6 +75,16 @@ http.createServer(async (req, res) => {
 		case "/current-items": {
 			try {
 				const currentItemsResult = getCurrentItems(getCache().items);
+				const contactsBaseUrl = process.env.LUCOS_CONTACTS_URL || '';
+				const seenUriTypes = new Set(currentItemsResult.items.map(i => `${i.uri}::${i.type}`));
+				for (const event of getContactsEvents()) {
+					const uri = `${contactsBaseUrl}${event.person_uri}`;
+					const key = `${uri}::${event.type}`;
+					if (!seenUriTypes.has(key)) {
+						seenUriTypes.add(key);
+						currentItemsResult.items.push({ uri, name: event.person_name, type: event.type });
+					}
+				}
 				res.writeHead(200, {'Content-Type': "application/json", 'Access-Control-Allow-Origin': "*"});
 				res.write(JSON.stringify(currentItemsResult));
 				res.end();
@@ -93,6 +104,7 @@ http.createServer(async (req, res) => {
 		case "/_info": {
 			const testurl = `${process.env.MEDIAURL}/big_00-00.mp4`;
 			const eolasStatus = getCacheStatus();
+			const contactsStatus = getContactsCacheStatus();
 			const output = {
 				system: 'lucos_time',
 				checks: {
@@ -107,12 +119,22 @@ http.createServer(async (req, res) => {
 							? `Cache is stale: last refreshed ${eolasStatus.lastRefreshed}`
 							: (eolasStatus.error || undefined),
 						dependsOn: 'lucos_eolas',
-					}
+					},
+					contacts: {
+						techDetail: 'Checks whether the contacts events cache is populated',
+						ok: contactsStatus.populated,
+						debug: contactsStatus.error || undefined,
+						dependsOn: 'lucos_contacts',
+					},
 				},
 				metrics: {
 					eolasLastRefreshed: {
 						value: eolasStatus.lastRefreshed ? new Date(eolasStatus.lastRefreshed).getTime() : null,
 						techDetail: 'Timestamp of the last eolas RDF cache refresh',
+					},
+					contactsLastRefreshed: {
+						value: contactsStatus.lastRefreshed ? new Date(contactsStatus.lastRefreshed).getTime() : null,
+						techDetail: 'Timestamp of the last contacts events cache refresh',
 					},
 				},
 				ci: {
@@ -145,3 +167,6 @@ console.log('Server running at http://127.0.0.1:'+port+'/');
 
 // Start eolas cache in the background (non-blocking)
 startCache().catch(err => { console.error(err.message); process.exit(1); });
+
+// Start contacts cache in the background (non-blocking)
+startContactsCache().catch(err => { console.error(err.message); process.exit(1); });
