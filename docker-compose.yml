@@ -9,7 +9,7 @@ services:
       - PORT
       - KEY_LUCOS_EOLAS
       - EOLAS_URL
-      - LUCOS_CONTACTS_URL
+      - LUCOS_CONTACTS_ORIGIN
       - KEY_LUCOS_CONTACTS
       - SCHEDULE_TRACKER_ENDPOINT
     image: lucas42/lucos_time:${VERSION:-latest}

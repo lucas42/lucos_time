@@ -1,4 +1,4 @@
-const CONTACTS_URL = process.env.LUCOS_CONTACTS_URL;
+const CONTACTS_URL = process.env.LUCOS_CONTACTS_ORIGIN;
 const KEY_LUCOS_CONTACTS = process.env.KEY_LUCOS_CONTACTS;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_GRACE_PERIOD_MS = 60 * 1000; // 1 minute
@@ -73,7 +73,7 @@ function scheduleNextRefresh() {
 }
 
 export async function startContactsCache() {
-	if (!CONTACTS_URL) throw new Error("'LUCOS_CONTACTS_URL' environment variable not set");
+	if (!CONTACTS_URL) throw new Error("'LUCOS_CONTACTS_ORIGIN' environment variable not set");
 	if (!KEY_LUCOS_CONTACTS) throw new Error("'KEY_LUCOS_CONTACTS' environment variable not set");
 	await refreshContactsCache();
 	scheduleNextRefresh();

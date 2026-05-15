@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { refreshContactsCache, getContactsEvents, getContactsItems, getContactsCacheStatus, stopContactsCache, _resetContactsCache, REFRESH_INTERVAL_MS } from '../contacts-cache.js';
 
-const CONTACTS_URL = process.env.LUCOS_CONTACTS_URL;
+const CONTACTS_URL = process.env.LUCOS_CONTACTS_ORIGIN;
 const KEY_LUCOS_CONTACTS = process.env.KEY_LUCOS_CONTACTS;
 
 const SAMPLE_EVENTS = [
