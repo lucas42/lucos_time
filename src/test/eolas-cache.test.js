@@ -386,7 +386,7 @@ describe('refreshCache', () => {
 	it('logs to schedule tracker on success', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
-		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/report-status';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/v2/report-status';
 		process.env.SYSTEM = 'lucos_time';
 
 		const calls = [];
@@ -403,21 +403,22 @@ describe('refreshCache', () => {
 
 		const trackerCall = calls.find(c => c.url.includes('report-status'));
 		assert.ok(trackerCall, 'Expected a call to schedule tracker');
-		// Regression guard: SCHEDULE_TRACKER_ENDPOINT already contains /report-status,
-		// so the URL must not be doubled to /report-status/report-status.
-		assert.equal(trackerCall.url, 'http://tracker.example/report-status', 'URL must not double the /report-status path');
+		// Regression guard: SCHEDULE_TRACKER_ENDPOINT already contains /v2/report-status,
+		// so the URL must not be doubled.
+		assert.equal(trackerCall.url, 'http://tracker.example/v2/report-status', 'URL must not double the /v2/report-status path');
 		// ADR-0001: User-Agent must be set to the SYSTEM env var value.
 		assert.equal(trackerCall.opts.headers['User-Agent'], 'lucos_time', 'User-Agent must be set per ADR-0001');
 		const body = JSON.parse(trackerCall.opts.body);
 		assert.equal(body.status, 'success');
 		assert.equal(body.system, 'lucos_time');
+		assert.equal(body.job_name, 'eolas-cache');
 		assert.equal(body.frequency, 3600);
 	});
 
 	it('logs error to schedule tracker on fetch failure', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
-		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/report-status';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/v2/report-status';
 		process.env.SYSTEM = 'lucos_time';
 
 		const calls = [];
@@ -445,7 +446,7 @@ describe('refreshCache', () => {
 	it('logs error when any eolas endpoint returns a non-ok status', async () => {
 		process.env.EOLAS_URL = 'http://eolas.example';
 		process.env.KEY_LUCOS_EOLAS = 'test-key';
-		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/report-status';
+		process.env.SCHEDULE_TRACKER_ENDPOINT = 'http://tracker.example/v2/report-status';
 
 		const calls = [];
 		globalThis.fetch = async (url, opts) => {

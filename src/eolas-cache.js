@@ -109,6 +109,7 @@ async function reportToScheduleTracker(success, message) {
 	if (!endpoint) return;
 	const payload = {
 		system: process.env.SYSTEM || 'lucos_time',
+		job_name: 'eolas-cache',
 		frequency: REFRESH_INTERVAL_MS / 1000,
 		status: success ? 'success' : 'error',
 		...(message && { message }),
