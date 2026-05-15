@@ -5,6 +5,11 @@ const TIME_ZONE = 'Europe/London';
 // Calendars whose temporal_id is populated in eolas are evaluated automatically.
 // No hardcoded calendar-name → Temporal ID mapping needed here.
 
+// Suppress repeated polyfill warnings: emit at most once per (calendar, UTC day).
+// Resets automatically when the UTC date rolls over (checked against `now` on each call).
+let _polyfillWarnedSet = new Set();
+let _polyfillWarnDate = '';
+
 // For each calendar in the cache with a temporal_id, we compute the current
 // ZonedDateTime in that calendar system and match months by temporalMonthCode.
 //
@@ -61,7 +66,15 @@ export function getCurrentItems(cacheItems, now) {
 			void zdt.monthCode;
 			void zdt.day;
 		} catch (e) {
-			console.error(`Skipping calendar ${cal.name} (${cal.temporalId}):`, e.message);
+			const todayUtc = now.toISOString().slice(0, 10);
+			if (_polyfillWarnDate !== todayUtc) {
+				_polyfillWarnDate = todayUtc;
+				_polyfillWarnedSet = new Set();
+			}
+			if (!_polyfillWarnedSet.has(cal.temporalId)) {
+				_polyfillWarnedSet.add(cal.temporalId);
+				console.error(`Skipping calendar ${cal.name} (${cal.temporalId}):`, e.message);
+			}
 			continue;
 		}
 		evaluatedCalendarNames.push(cal.name);

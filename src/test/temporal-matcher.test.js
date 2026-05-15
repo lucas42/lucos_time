@@ -490,6 +490,33 @@ describe('getCurrentItems', () => {
 			assert.deepEqual(result.items, []);
 			assert.deepEqual(result.evaluated_calendars, []);
 		});
+
+		it('should emit a polyfill warning only once per calendar per UTC day, not once per call', () => {
+			// Use a distinct temporalId to avoid interference with other test cases in this suite.
+			const dedupCalUri = 'https://example.com/calendar/dedup/';
+			const dedupCalendars = new Map([
+				[dedupCalUri, { uri: dedupCalUri, name: 'DedupCal', temporalId: 'bad-calendar-id-dedup' }],
+			]);
+			// Use a distinct date (2026-04-01) so this test's warned-set entry doesn't interfere
+			// with the other tests that use 2026-03-15.
+			const april = new Date('2026-04-01T12:00:00Z');
+			const cache = makeCache({ calendars: dedupCalendars });
+
+			const messages = [];
+			const origError = console.error;
+			console.error = (...args) => messages.push(args.join(' '));
+			try {
+				getCurrentItems(cache, april);
+				getCurrentItems(cache, april);
+				getCurrentItems(cache, april);
+			} finally {
+				console.error = origError;
+			}
+
+			// The warning should fire exactly once, not once per call.
+			const dedupMessages = messages.filter(m => m.includes('DedupCal'));
+			assert.equal(dedupMessages.length, 1);
+		});
 	});
 
 	describe('London timezone handling', () => {
