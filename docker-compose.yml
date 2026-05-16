@@ -12,6 +12,7 @@ services:
       - LUCOS_CONTACTS_ORIGIN
       - KEY_LUCOS_CONTACTS
       - SCHEDULE_TRACKER_ENDPOINT
+      - SYSTEM
     image: lucas42/lucos_time:${VERSION:-latest}
     restart: always
     healthcheck:
