@@ -13,9 +13,11 @@ export default async () => {
 			path: new URL('./resources/', import.meta.url).pathname,
 		},
 		plugins: [
-			// Get the hashes of all the resources to embed in a comment in service worker
+			// Get the hashes of all the resources, client source, and dependencies to embed in a comment in service worker.
+			// Client JS Hash ensures source-only changes produce a different serviceworker.js in Docker/CI builds.
+			// Dependency Hash covers package-lock.json so that dependency-only changes also trigger a browser SW update.
 			new webpack.BannerPlugin({
-				banner: `Resource Hash: ${(await hashElement("./resources")).hash}`,
+				banner: `Resource Hash: ${(await hashElement("./resources")).hash}\nClient JS Hash: ${(await hashElement("./client")).hash}\nDependency Hash: ${(await hashElement("./package-lock.json")).hash}`,
 				include: 'serviceworker',
 			}),
 		],
